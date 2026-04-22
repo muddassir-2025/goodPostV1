@@ -1,69 +1,84 @@
 import { useSelector } from "react-redux";
-import { Link } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
+import Avatar from "./Avatar";
 import LogoutBtn from "./LogoutBtn";
+import { HeartIcon, MessageIcon, PlusSquareIcon } from "./ui/Icons";
+import { getHandle } from "../lib/ui";
+
+function ActionLink({ to, label, icon }) {
+  const Icon = icon;
+
+  return (
+    <NavLink
+      to={to}
+      aria-label={label}
+      className={({ isActive }) =>
+        `flex h-11 w-11 items-center justify-center rounded-full border transition ${
+          isActive
+            ? "border-white/20 bg-zinc-100 !text-zinc-950"
+            : "border-white/10 bg-white/5 text-zinc-300 hover:border-white/20 hover:text-white"
+        }`
+      }
+    >
+      {({ isActive }) => <Icon className="h-5 w-5" filled={isActive} />}
+    </NavLink>
+  );
+}
 
 export default function Navbar() {
   const user = useSelector((state) => state.auth.userData);
 
   return (
-    <nav className="w-full px-6 py-3 flex items-center justify-between 
-      bg-slate-50 dark:bg-slate-900 
-      text-slate-700 dark:text-slate-200 
-      shadow-sm border-b border-slate-200 dark:border-slate-800"
-    >
-      {/* Left - Brand / Home */}
-      <div className="flex items-center gap-3">
-        <Link
-          to="/"
-          className="px-3 py-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 transition"
-        >
-          Home
+    <header className="fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-black/72 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-3 py-3 sm:px-5">
+        <Link to="/" className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-[18px] bg-gradient-to-br from-fuchsia-500 via-rose-500 to-amber-400 shadow-lg shadow-rose-500/20">
+            <span className="font-display text-lg text-black">M</span>
+          </div>
+          <div>
+            <p className="font-display text-lg tracking-wide text-white">Moments</p>
+            <p className="hidden text-xs text-zinc-500 sm:block">Photo and audio journaling</p>
+          </div>
         </Link>
 
-        <Link
-          to="/favorites"
-          className="px-3 py-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 transition"
-        >
-          Favorites
-        </Link>
-
-
-      </div>
-
-      {/* Right - Links */}
-      <div className="flex items-center gap-3">
         {user ? (
-          <>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ActionLink to="/create" label="Create post" icon={PlusSquareIcon} />
+            <ActionLink to="/favorites" label="Favorites" icon={HeartIcon} />
+            <ActionLink to="/messages" label="Messages" icon={MessageIcon} />
+
             <Link
-              to="/create"
-              className="px-3 py-1 rounded-md bg-indigo-100 text-indigo-700 
-              dark:bg-indigo-500/20 dark:text-indigo-300 
-              hover:scale-[1.03] transition"
+              to="/profile"
+              className="hidden items-center gap-3 rounded-full border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-zinc-300 transition hover:border-white/20 hover:text-white md:flex"
             >
-              Create Post
+              <Avatar name={user.name} size="sm" />
+              <div className="pr-2">
+                <p className="font-medium text-white">{getHandle(user.name)}</p>
+                <p className="text-xs text-zinc-500">Profile</p>
+              </div>
             </Link>
 
-            <LogoutBtn />
-          </>
+            <div className="hidden md:block">
+              <LogoutBtn />
+            </div>
+          </div>
         ) : (
-          <>
+          <div className="flex items-center gap-2">
             <Link
               to="/login"
-              className="px-3 py-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 transition"
+              className="rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-white/20 hover:text-white"
             >
-              Login
+              Log in
             </Link>
-
             <Link
               to="/signup"
-              className="px-3 py-1 rounded-md bg-indigo-500 text-white 
-              hover:bg-indigo-600 transition"
+              className="rounded-full bg-zinc-100 px-4 py-2 text-sm font-semibold !text-zinc-950 transition hover:bg-zinc-200 hover:!text-zinc-950"
             >
-              Signup
+              Join now
             </Link>
-          </>
+          </div>
         )}
       </div>
-    </nav>
+    </header>
   );
 }

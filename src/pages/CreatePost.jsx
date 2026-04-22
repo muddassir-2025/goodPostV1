@@ -1,27 +1,59 @@
-import { useSelector } from "react-redux";
-import { useState } from "react";
-import postService from "../appwrite/post";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import UploadModal from "../components/UploadModal";
+import { AudioIcon, ImageIcon } from "../components/ui/Icons";
+import postService from "../appwrite/post";
+import { createSlug } from "../lib/ui";
 
-export default function Createpost() {
+export default function CreatePost() {
   const user = useSelector((state) => state.auth.userData);
   const navigate = useNavigate();
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-
   const [image, setImage] = useState(null);
   const [audio, setAudio] = useState(null);
-
+  const [imagePreview, setImagePreview] = useState("");
+  const [audioPreview, setAudioPreview] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  useEffect(() => {
+    if (!image) {
+      setImagePreview("");
+      return undefined;
+    }
 
-    if (!user) return;
+    const objectUrl = URL.createObjectURL(image);
+    setImagePreview(objectUrl);
+
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [image]);
+
+  useEffect(() => {
+    if (!audio) {
+      setAudioPreview("");
+      return undefined;
+    }
+
+    const objectUrl = URL.createObjectURL(audio);
+    setAudioPreview(objectUrl);
+
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [audio]);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError("");
+
+    if (!user) {
+      setError("Please log in before creating a post.");
+      return;
+    }
 
     if (!image && !audio) {
-      alert("Please upload image or audio");
+      setError("Add an image or audio file before publishing.");
       return;
     }
 
@@ -32,21 +64,22 @@ export default function Createpost() {
       let audioId = null;
 
       if (image) {
-        const uploaded = await postService.uploadImage(image, user.$id);
-        imageId = uploaded?.$id;
+        const uploadedImage = await postService.uploadImage(image, user.$id);
+        imageId = uploadedImage?.$id || null;
       }
 
       if (audio) {
-        const uploaded = await postService.uploadAudio(audio, user.$id);
-        audioId = uploaded?.$id;
+        const uploadedAudio = await postService.uploadAudio(audio, user.$id);
+        audioId = uploadedAudio?.$id || null;
       }
 
-      const slug = title.toLowerCase().trim().replaceAll(" ", "-");
+      const resolvedTitle =
+        title.trim() || content.trim().split(/\s+/).slice(0, 6).join(" ") || "new-post";
 
       await postService.createPost({
-        title,
+        title: resolvedTitle,
         content,
-        slug,
+        slug: createSlug(resolvedTitle) || `post-${Date.now()}`,
         userId: user.$id,
         userName: user.name,
         imageId,
@@ -54,133 +87,130 @@ export default function Createpost() {
       });
 
       navigate("/");
-    } catch (err) {
-      console.log(err);
+    } catch (uploadError) {
+      setError(uploadError?.message || "Post creation failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
+  }
 
-    setLoading(false);
-  };
-
- return (
-  <div className="min-h-screen bg-black text-white flex items-center justify-center px-4">
-    
-    <form
-      onSubmit={handleSubmit}
-      className="w-full max-w-2xl bg-[#121212] rounded-2xl p-6 space-y-6 shadow-2xl"
-    >
-      {/* HEADER */}
-      <h2 className="text-3xl font-bold tracking-tight">
-        Create Post
-      </h2>
-
-      {/* TITLE */}
-      <input
-        placeholder="Title"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        className="w-full bg-[#1f1f1f] border border-[#2a2a2a] 
-        rounded-lg px-4 py-3 text-white placeholder-gray-400
-        focus:outline-none focus:ring-2 focus:ring-green-500"
-      />
-
-      {/* CONTENT */}
-      <textarea
-        placeholder="What's on your mind?"
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        rows={4}
-        className="w-full bg-[#1f1f1f] border border-[#2a2a2a] 
-        rounded-lg px-4 py-3 text-white placeholder-gray-400
-        focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-      />
-
-      {/* MEDIA SECTION */}
-      <div className="grid grid-cols-2 gap-4">
-        
-       {/* IMAGE CARD */}
-<label className="cursor-pointer bg-[#181818] border border-[#2a2a2a] 
-  rounded-xl p-4 flex flex-col items-center gap-3 
-  hover:bg-[#202020] transition w-40">
-
-  {/* IMAGE PREVIEW BOX */}
-  <div className="w-full aspect-square rounded-lg overflow-hidden bg-[#121212] flex items-center justify-center">
-    
-    {image ? (
-      <img
-        src={URL.createObjectURL(image)}
-        alt="preview"
-        className="w-full h-full object-cover"
-      />
-    ) : (
-      <span className="text-3xl">🖼</span>
-    )}
-
-  </div>
-
-  <span className="text-sm text-gray-400 text-center">
-    {image ? image.name : "Upload Image"}
-  </span>
-
-  <input
-    type="file"
-    accept="image/*"
-    className="hidden"
-    onChange={(e) => setImage(e.target.files[0])}
-  />
-</label>
-
-        {/* AUDIO CARD */}
-        <label className="cursor-pointer bg-[#181818] border border-[#2a2a2a] 
-          rounded-xl p-4 flex flex-col items-center justify-center 
-          hover:bg-[#202020] transition">
-
-          <span className="text-2xl mb-2">🎧</span>
-          <span className="text-sm text-gray-400">Upload Audio</span>
-
-          <input
-            type="file"
-            accept="audio/*"
-            className="hidden"
-            onChange={(e) => setAudio(e.target.files[0])}
-          />
-        </label>
-      </div>
-
-      {/* PREVIEW */}
-      <div className="space-y-3">
-        {image && (
-          <div className="bg-[#181818] p-3 rounded-lg">
-            <p className="text-xs text-gray-400 mb-2">Image Preview</p>
-            <img
-              src={URL.createObjectURL(image)}
-              className="rounded-lg max-h-48 object-cover"
-            />
-          </div>
-        )}
-
-        {audio && (
-          <div className="bg-[#181818] p-3 rounded-lg">
-            <p className="text-xs text-gray-400 mb-2">Audio Preview</p>
-            <audio
-              controls
-              className="w-full"
-              src={URL.createObjectURL(audio)}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* BUTTON */}
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full bg-green-500 hover:bg-green-400 
-        text-black font-semibold py-3 rounded-full 
-        transition active:scale-95 disabled:opacity-50"
+  return (
+    <div className="flex min-h-[calc(100vh-7rem)] items-center justify-center py-4">
+      <UploadModal
+        title="Create post"
+        description="Upload a photo or an audio drop, add a caption, and publish it into the feed."
+        onClose={() => navigate("/")}
       >
-        {loading ? "Uploading..." : "Create Post"}
-      </button>
-    </form>
-  </div>
-);
+        <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-[1fr,1.05fr]">
+          <div className="space-y-4">
+            <div className="overflow-hidden rounded-[28px] border border-white/10 bg-black/35 p-3">
+              {imagePreview ? (
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="aspect-[4/5] w-full rounded-[22px] object-cover"
+                />
+              ) : (
+                <div className="flex aspect-[4/5] items-center justify-center rounded-[22px] bg-[radial-gradient(circle_at_top,_rgba(255,115,0,0.28),_transparent_45%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] px-10 text-center">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.3em] text-zinc-500">Preview</p>
+                    <h2 className="font-display mt-3 text-3xl text-white">Your next post</h2>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {audioPreview ? (
+              <div className="rounded-[24px] border border-white/10 bg-black/35 p-3">
+                <p className="mb-2 text-xs uppercase tracking-[0.25em] text-zinc-500">Audio preview</p>
+                <div className="rounded-full bg-zinc-100 p-1">
+                  <audio controls className="w-full" src={audioPreview} />
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="space-y-4">
+            {error ? (
+              <div className="rounded-[22px] border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                {error}
+              </div>
+            ) : null}
+
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-zinc-300">Short title</span>
+              <input
+                type="text"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="Sunset walk, studio drop, coffee run..."
+                className="w-full rounded-[22px] border border-white/10 bg-black/35 px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-white/20"
+              />
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-zinc-300">Caption</span>
+              <textarea
+                value={content}
+                onChange={(event) => setContent(event.target.value)}
+                rows={7}
+                placeholder="Tell the story behind the moment..."
+                className="w-full rounded-[24px] border border-white/10 bg-black/35 px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-white/20"
+              />
+            </label>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="cursor-pointer rounded-[24px] border border-white/10 bg-black/35 p-4 transition hover:border-white/20 hover:bg-white/5">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/8 text-zinc-200">
+                    <ImageIcon className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-white">Upload image</p>
+                    <p className="text-xs text-zinc-500">
+                      {image ? image.name : "JPG, PNG, or WebP"}
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => setImage(event.target.files?.[0] || null)}
+                />
+              </label>
+
+              <label className="cursor-pointer rounded-[24px] border border-white/10 bg-black/35 p-4 text-zinc-100 transition hover:border-white/20 hover:bg-white/5">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/8 text-zinc-200">
+                    <AudioIcon className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-100">Upload audio</p>
+                    <p className="text-xs text-zinc-400">
+                      {audio ? audio.name : "MP3, WAV, or M4A"}
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="file"
+                  accept="audio/*"
+                  className="hidden"
+                  onChange={(event) => setAudio(event.target.files?.[0] || null)}
+                />
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-full bg-zinc-100 px-5 py-3 text-sm font-semibold !text-zinc-950 transition hover:bg-zinc-200 hover:!text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? "Publishing..." : "Publish post"}
+            </button>
+          </div>
+        </form>
+      </UploadModal>
+    </div>
+  );
 }

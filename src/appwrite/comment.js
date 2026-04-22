@@ -76,7 +76,7 @@ class CommentService {
   }
 
   //delete comment
-   async deleteComment(commentId) {
+   async deleteComment(commentId, postId) {
     try {
       const res = await this.databases.deleteDocument(
         import.meta.env.VITE_APPWRITE_DATABASE_ID,
@@ -84,13 +84,15 @@ class CommentService {
         commentId
       );
 
-      const post = await postService.getPostById(commentId);
+      if (postId) {
+        const post = await postService.getPostById(postId);
 
-      await postService.updatePost(commentId, {
-            commentCount: Math.max((post.commentCount || 0) - 1, 0) //commentCount is variable in postService
+        await postService.updatePost(postId, {
+            commentCount: Math.max((post?.commentCount || 0) - 1, 0)
         });
+      }
 
-        return res;
+      return res;
           
     } catch (error) {
       console.log("delete comment error: ", error);

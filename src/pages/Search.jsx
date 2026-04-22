@@ -1,44 +1,29 @@
-import { useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import EmptyState from "../components/EmptyState";
 import PostSkeleton from "../components/PostSkeleton";
-import favoriteService from "../appwrite/favorite";
-import postService from "../appwrite/post";
+import { SearchIcon } from "../components/ui/Icons";
+import { fetchFeedPosts, filterPosts, sortPosts } from "../lib/posts";
 import { getFileUrl, getHandle } from "../lib/ui";
 
-export default function Favorites() {
+export default function Search() {
   const user = useSelector((state) => state.auth.userData);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+
+  const deferredQuery = useDeferredValue(query);
 
   useEffect(() => {
     let active = true;
 
-    async function fetchFavorites() {
-      if (!user) {
-        setPosts([]);
-        setLoading(false);
-        return;
-      }
-
+    async function loadPosts() {
       setLoading(true);
-
       try {
-        const favoriteResponse = await favoriteService.getUSerAllFavorites(user.$id);
-        const postIds = favoriteResponse?.documents?.map((item) => item.postId) || [];
-
-        if (!postIds.length) {
-          if (active) {
-            setPosts([]);
-          }
-          return;
-        }
-
-        const resolvedPosts = await Promise.all(postIds.map((id) => postService.getPostById(id)));
-
+        const data = await fetchFeedPosts(user);
         if (active) {
-          setPosts(resolvedPosts.filter(Boolean));
+          setPosts(data);
         }
       } finally {
         if (active) {
@@ -47,27 +32,44 @@ export default function Favorites() {
       }
     }
 
-    fetchFavorites();
+    loadPosts();
     return () => {
       active = false;
     };
   }, [user]);
 
+  const results = sortPosts(filterPosts(posts, deferredQuery), "latest");
+
   return (
     <div className="space-y-5">
       <section className="rounded-[32px] border border-white/10 bg-[#121212]/90 p-5 shadow-[0_30px_90px_rgba(0,0,0,0.34)]">
-        <p className="text-xs uppercase tracking-[0.32em] text-zinc-500">Favorites</p>
-        <h1 className="font-display mt-3 text-3xl text-white">Saved collection</h1>
+        <p className="text-xs uppercase tracking-[0.32em] text-zinc-500">Search</p>
+        <h1 className="font-display mt-3 text-3xl text-white">Discover creators</h1>
         <p className="mt-2 text-sm leading-6 text-zinc-400">
-          Keep the posts you want to revisit in a clean, tappable grid.
+          Browse the latest uploads, search by caption, and jump into any post in one tap.
         </p>
+
+        <div className="mt-5 rounded-[26px] border border-white/10 bg-black/35 p-3">
+          <label className="flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/6 text-zinc-400">
+              <SearchIcon className="h-5 w-5" />
+            </span>
+            <input
+              type="text"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search by title, caption, or creator"
+              className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-500"
+            />
+          </label>
+        </div>
       </section>
 
       {loading ? (
         <PostSkeleton count={2} />
-      ) : posts.length ? (
+      ) : results.length ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {posts.map((post) => {
+          {results.map((post) => {
             const imageSrc = getFileUrl(post.featuredImg);
 
             return (
@@ -86,7 +88,7 @@ export default function Favorites() {
                 ) : (
                   <div className="flex aspect-square items-end bg-[radial-gradient(circle_at_top,_rgba(255,115,0,0.28),_transparent_45%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] p-4">
                     <div>
-                      <p className="text-xs uppercase tracking-[0.25em] text-zinc-500">Saved audio</p>
+                      <p className="text-xs uppercase tracking-[0.25em] text-zinc-500">Audio</p>
                       <h2 className="font-display mt-2 text-lg text-white">{post.title}</h2>
                     </div>
                   </div>
@@ -101,10 +103,10 @@ export default function Favorites() {
         </div>
       ) : (
         <EmptyState
-          eyebrow="Favorites"
-          title="Nothing saved yet"
-          description="Tap the bookmark on any post and it will show up here."
-          actionLabel="Explore feed"
+          eyebrow="Search"
+          title="No results yet"
+          description="Try a broader phrase or clear the query to explore the full collection."
+          actionLabel="Back to feed"
           actionTo="/"
         />
       )}

@@ -1,160 +1,243 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import postService from "../appwrite/post";
+import { useDeferredValue, useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
+import EmptyState from "../components/EmptyState";
+import PostCard from "../components/PostCard";
+import PostSkeleton from "../components/PostSkeleton";
+import StoryBar from "../components/StoryBar";
+import { SearchIcon } from "../components/ui/Icons";
+import postService from "../appwrite/post";
+import { syncFavorite, syncLike } from "../lib/engagement";
+import { fetchFeedPosts, filterPosts, sortPosts } from "../lib/posts";
+import { buildStories } from "../lib/ui";
+
+const filters = [
+  { id: "latest", label: "Latest" },
+  { id: "likes", label: "Popular" },
+  { id: "comments", label: "Discussed" },
+];
 
 export default function Home() {
-  const [posts, setPosts] = useState([]);
+  const user = useSelector((state) => state.auth.userData);
   const navigate = useNavigate();
+
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("latest");
 
-  const user = useSelector((state) => state.auth.userData);
-
-  const fetchPosts = async () => {
-    const res = await postService.getPosts(search);
-
-    if (!res) return;
-
-    let data = res.documents;
-
-    // 🔍 search (if using frontend filter also)
-    if (search.trim()) {
-      data = data.filter(post =>
-        post.title.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-
-    // 🔽 FILTER LOGIC
-    if (filter === "latest") {
-      data.sort((a, b) => new Date(b.$createdAt) - new Date(a.$createdAt));
-    }
-
-    if (filter === "likes") {
-      data.sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0));
-    }
-
-    if (filter === "comments") {
-      data.sort((a, b) => (b.commentCount || 0) - (a.commentCount || 0));
-    }
-
-    setPosts(data);
-  };
+  const deferredSearch = useDeferredValue(search);
 
   useEffect(() => {
-    fetchPosts();
-  }, [search, filter]);
+    let active = true;
 
-  const handleDelete = async (postId, fileId) => {
+    async function loadFeed() {
+      setLoading(true);
+      setError("");
+
+      try {
+        const data = await fetchFeedPosts(user);
+        if (active) {
+          setPosts(data);
+        }
+      } catch {
+        if (active) {
+          setError("Could not load the feed right now.");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadFeed();
+    return () => {
+      active = false;
+    };
+  }, [user]);
+
+  const visiblePosts = sortPosts(filterPosts(posts, deferredSearch), filter);
+  const stories = buildStories(posts, user);
+
+  function updatePost(postId, updater) {
+    setPosts((current) =>
+      current.map((post) => (post.$id === postId ? updater(post) : post)),
+    );
+  }
+
+  async function handleLikeToggle(post) {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    const nextLiked = !post.liked;
+    updatePost(post.$id, (current) => ({
+      ...current,
+      liked: nextLiked,
+      likeCount: Math.max((current.likeCount || 0) + (nextLiked ? 1 : -1), 0),
+    }));
+
     try {
-      if (!window.confirm("Delete this post?")) return;
+      await syncLike({
+        postId: post.$id,
+        userId: user.$id,
+        currentlyLiked: post.liked,
+      });
+    } catch {
+      updatePost(post.$id, (current) => ({
+        ...current,
+        liked: post.liked,
+        likeCount: post.likeCount || 0,
+      }));
+    }
+  }
 
-      if (fileId) {
-        await postService.deleteFile(fileId);
+  async function handleFavoriteToggle(post) {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    const nextSaved = !post.saved;
+    updatePost(post.$id, (current) => ({
+      ...current,
+      saved: nextSaved,
+      favoriteId: nextSaved ? current.favoriteId : null,
+    }));
+
+    try {
+      const result = await syncFavorite({
+        postId: post.$id,
+        userId: user.$id,
+        currentlySaved: post.saved,
+        favoriteId: post.favoriteId,
+      });
+
+      updatePost(post.$id, (current) => ({
+        ...current,
+        saved: result.saved,
+        favoriteId: result.favoriteId,
+      }));
+    } catch {
+      updatePost(post.$id, (current) => ({
+        ...current,
+        saved: post.saved,
+        favoriteId: post.favoriteId || null,
+      }));
+    }
+  }
+
+  async function handleDelete(post) {
+    if (!window.confirm("Delete this post?")) {
+      return;
+    }
+
+    try {
+      if (post.featuredImg) {
+        await postService.deleteFile(post.featuredImg);
       }
 
-      await postService.deletePost(postId);
-      fetchPosts();
-    } catch (error) {
-      console.log("delete error ", error);
+      if (post.audioId) {
+        await postService.deleteFile(post.audioId);
+      }
+
+      await postService.deletePost(post.$id);
+      setPosts((current) => current.filter((item) => item.$id !== post.$id));
+    } catch {
+      setError("Delete failed. Please try again.");
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 px-4 py-6">
-      <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-100 mb-6">
-        All Posts
-      </h2>
-
-      <div className="flex gap-4 mb-4">
-        <input
-          type="text"
-          placeholder="Search posts..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="p-2 rounded w-72 border-2 border-amber-50 text-amber-50"
-        />
-
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="rounded w-72 border-2 border-amber-50 bg-gray-900 text-white p-2"
-        >
-          <option value="latest" className="bg-gray-900 text-white">
-            Latest
-          </option>
-          <option value="likes" className="bg-gray-900 text-white">
-            Most Liked ❤️
-          </option>
-          <option value="comments" className="bg-gray-900 text-white">
-            Most Commented 💬
-          </option>
-        </select>
-
-      </div>
-
-      <div className="space-y-4">
-        {posts.map((post) => (
-          <div
-            key={post.$id}
-            className="bg-white dark:bg-slate-900 
-            border border-slate-200 dark:border-slate-800 
-            rounded-xl p-4 shadow-sm hover:shadow-md transition"
-          >
-            {/* Title */}
-            <h3
-              onClick={() => navigate(`/post/${post.slug}`)}
-              className="text-lg font-semibold text-slate-800 dark:text-slate-100 
-              cursor-pointer hover:text-indigo-500 transition"
-            >
-              {post.title}
-            </h3>
-
-            {/* Content */}
-            <p className="text-slate-600 dark:text-slate-300 mt-2">
-              {post.content}
+    <div className="space-y-5">
+      <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[#121212]/90 p-5 shadow-[0_30px_90px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+        <p className="text-xs uppercase tracking-[0.32em] text-zinc-500">Feed</p>
+        <div className="mt-3 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="font-display text-3xl text-white">For you</h1>
+            <p className="mt-2 max-w-md text-sm leading-6 text-zinc-400">
+              A focused feed for photos, captions, and audio drops with a clean
+              Instagram-style rhythm.
             </p>
-
-            {/* Image */}
-            {post.featuredImg && (
-              <div className="mt-3 w-48 aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
-                <img
-                  src={`https://fra.cloud.appwrite.io/v1/storage/buckets/${import.meta.env.VITE_APPWRITE_BUCKET_ID}/files/${post.featuredImg}/view?project=${import.meta.env.VITE_APPWRITE_PROJECT_ID}`}
-                  alt="post"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            )}
-            
-            {/* Actions */}
-            {user?.$id === post.authorID && (
-              <div className="flex gap-3 mt-4">
-                <button
-                  onClick={() => navigate(`/edit/${post.$id}`)}
-                  className="px-3 py-1 rounded-md 
-                  bg-amber-100 text-amber-700 
-                  dark:bg-amber-500/20 dark:text-amber-300 
-                  hover:bg-amber-200 dark:hover:bg-amber-500/30 
-                  transition"
-                >
-                  Edit
-                </button>
-
-                <button
-                  onClick={() => handleDelete(post.$id, post.featuredImg)}
-                  className="px-3 py-1 rounded-md 
-                  bg-rose-100 text-rose-600 
-                  dark:bg-rose-500/20 dark:text-rose-300 
-                  hover:bg-rose-200 dark:hover:bg-rose-500/30 
-                  transition"
-                >
-                  Delete
-                </button>
-              </div>
-            )}
           </div>
-        ))}
-      </div>
+
+          <Link
+            to={user ? "/create" : "/login"}
+            className="hidden rounded-full bg-zinc-100 px-4 py-2 text-sm font-semibold !text-zinc-950 transition hover:bg-zinc-200 hover:!text-zinc-950 sm:inline-flex"
+          >
+            Share
+          </Link>
+        </div>
+
+        <div className="mt-5 rounded-[26px] border border-white/10 bg-black/35 p-3">
+          <label className="flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/6 text-zinc-400">
+              <SearchIcon className="h-5 w-5" />
+            </span>
+            <input
+              type="text"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search posts, captions, or creators"
+              className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-500"
+            />
+          </label>
+        </div>
+
+        <div className="hide-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
+          {filters.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setFilter(item.id)}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                filter === item.id
+                  ? "bg-zinc-100 !text-zinc-950"
+                  : "border border-white/10 bg-white/5 text-zinc-400 hover:border-white/20 hover:text-white"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <StoryBar stories={stories} />
+
+      {error ? (
+        <div className="rounded-[26px] border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          {error}
+        </div>
+      ) : null}
+
+      {loading ? (
+        <PostSkeleton count={3} />
+      ) : visiblePosts.length ? (
+        <div className="space-y-4">
+          {visiblePosts.map((post) => (
+            <PostCard
+              key={post.$id}
+              post={post}
+              currentUserId={user?.$id}
+              onToggleLike={handleLikeToggle}
+              onToggleFavorite={handleFavoriteToggle}
+              onDelete={handleDelete}
+              onEdit={(postId) => navigate(`/edit/${postId}`)}
+            />
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          eyebrow="Feed quiet"
+          title="No posts match this vibe"
+          description="Try a different search term or clear the filters to see everything again."
+          actionLabel="Create a post"
+          actionTo={user ? "/create" : "/login"}
+        />
+      )}
     </div>
   );
 }

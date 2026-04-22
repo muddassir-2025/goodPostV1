@@ -37,7 +37,7 @@ class PostService {
           likeCount: 0,
           commentCount: 0,
 
-          isSystem: true
+          isSystem
         }
       );
     } catch (error) {

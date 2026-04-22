@@ -61,7 +61,7 @@ class LikeService {
     //     }
     // }
 
-    async deleteLike(likeId) {
+    async deleteLike(likeId, postId) {
     try {
         await this.databases.deleteDocument(
             import.meta.env.VITE_APPWRITE_DATABASE_ID,
@@ -69,12 +69,13 @@ class LikeService {
             likeId
         );
 
-        // // ✅ UPDATE POST LIKE COUNT
-        // const post = await postService.getPostById(postId);
+        if (postId) {
+            const post = await postService.getPostById(postId);
 
-        // await postService.updatePost(postId, {
-        //     likeCount: Math.max((post.likeCount || 0) - 1, 0) //likeCount is variable in postService
-        // });
+            await postService.updatePost(postId, {
+                likeCount: Math.max((post?.likeCount || 0) - 1, 0)
+            });
+        }
 
     } catch (error) {
         console.log("deleteLike error", error);

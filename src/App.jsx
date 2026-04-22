@@ -1,72 +1,105 @@
-import { useEffect,useState } from "react";
+import { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
-import { login, logout } from "./features/auth/authSlice";
-
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import authService from "./appwrite/auth";
-
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import CreatePost from "./pages/Createpost";
-import EditPost from "./pages/EditPost";
-import Home from "./pages/Home";
-import SinglePost from "./pages/SinglePost";
-import Favorites from "./pages/Favorite";
-
+import AppErrorBoundary from "./components/AppErrorBoundary";
+import AppShell from "./components/AppShell";
 import ProtectedRoute from "./components/ProtectedRoute";
-import Navbar from "./components/Navbar";
+import { login, logout } from "./features/auth/authSlice";
+import CreatePost from "./pages/CreatePost";
+import EditPost from "./pages/EditPost";
+import Favorites from "./pages/Favorite";
+import Home from "./pages/Home";
+import Login from "./pages/Login";
+import Messages from "./pages/Messages";
+import Profile from "./pages/Profile";
+import Reels from "./pages/Reels";
+import Search from "./pages/Search";
+import Signup from "./pages/Signup";
+import SinglePost from "./pages/SinglePost";
 
 function App() {
   const dispatch = useDispatch();
-
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     authService.getCurrentUser().then((user) => {
-      if (user) dispatch(login(user));
-      else dispatch(logout());
-      setLoading(false); // ✅ important
-    });
-  }, []);
+      if (user) {
+        dispatch(login(user));
+      } else {
+        dispatch(logout());
+      }
 
-   // ✅ ADD THIS HERE (before return)
+      setLoading(false);
+    });
+  }, [dispatch]);
+
   if (loading) {
-    return <h1>Loading...</h1>;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black text-white">
+        <div className="rounded-[28px] border border-white/10 bg-[#121212]/90 px-6 py-5 text-center shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+          <p className="text-xs uppercase tracking-[0.3em] text-zinc-500">Moments</p>
+          <h1 className="font-display mt-3 text-2xl text-white">Loading your feed</h1>
+        </div>
+      </div>
+    );
   }
 
   return (
     <BrowserRouter>
-      <Navbar />
-
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-        <Route path="/" element={<Home />} />
-        <Route path="/favorites" element={<Favorites/>} />
-       <Route path="/post/:slug" element={<SinglePost />} />
-        
+
         <Route
-          path="/create"
-          element={
-            <ProtectedRoute>
-              <CreatePost />
-            </ProtectedRoute>
-          }
-        />
+          element={(
+            <AppErrorBoundary>
+              <AppShell />
+            </AppErrorBoundary>
+          )}
+        >
+          <Route index element={<Home />} />
+          <Route path="/search" element={<Search />} />
+          <Route path="/reels" element={<Reels />} />
+          <Route path="/messages" element={<Messages />} />
+          <Route path="/post/:slug" element={<SinglePost />} />
 
-         <Route
-          path="/edit/:id"
-          element={
-            <ProtectedRoute>
-              <EditPost />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/favorites"
+            element={
+              <ProtectedRoute>
+                <Favorites />
+              </ProtectedRoute>
+            }
+          />
 
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
 
+          <Route
+            path="/create"
+            element={
+              <ProtectedRoute>
+                <CreatePost />
+              </ProtectedRoute>
+            }
+          />
 
-
+          <Route
+            path="/edit/:id"
+            element={
+              <ProtectedRoute>
+                <EditPost />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
       </Routes>
     </BrowserRouter>
   );

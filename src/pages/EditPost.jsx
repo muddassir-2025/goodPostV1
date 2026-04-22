@@ -1,112 +1,254 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useSelector } from "react-redux";
+import PostSkeleton from "../components/PostSkeleton";
+import UploadModal from "../components/UploadModal";
+import { AudioIcon, ImageIcon } from "../components/ui/Icons";
 import postService from "../appwrite/post";
+import { createSlug, getFileUrl } from "../lib/ui";
 
 export default function EditPost() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const user = useSelector((state) => state.auth.userData);
+
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [image, setImage] = useState(null);
-
-  const { id } = useParams();
-  const navigate = useNavigate();
-
+  const [audio, setAudio] = useState(null);
   const [oldImageId, setOldImageId] = useState(null);
+  const [oldAudioId, setOldAudioId] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const [audioPreview, setAudioPreview] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    postService.getPostById(id).then((post) => {
-      setTitle(post.title);
-      setContent(post.content);
-      setOldImageId(post.featuredImg);
-    });
+    let active = true;
+
+    async function loadPost() {
+      setLoading(true);
+      try {
+        const post = await postService.getPostById(id);
+
+        if (active && post) {
+          setTitle(post.title || "");
+          setContent(post.content || "");
+          setOldImageId(post.featuredImg || null);
+          setOldAudioId(post.audioId || null);
+        }
+      } catch {
+        if (active) {
+          setError("Could not load the post.");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadPost();
+    return () => {
+      active = false;
+    };
   }, [id]);
 
-  const handleUpdate = async (e) => {
-    e.preventDefault();
+  useEffect(() => {
+    if (!image) {
+      setImagePreview("");
+      return undefined;
+    }
+
+    const objectUrl = URL.createObjectURL(image);
+    setImagePreview(objectUrl);
+
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [image]);
+
+  useEffect(() => {
+    if (!audio) {
+      setAudioPreview("");
+      return undefined;
+    }
+
+    const objectUrl = URL.createObjectURL(audio);
+    setAudioPreview(objectUrl);
+
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [audio]);
+
+  async function handleUpdate(event) {
+    event.preventDefault();
+    setError("");
+    setSaving(true);
 
     try {
-      let newFileId = oldImageId;
+      let nextImageId = oldImageId;
+      let nextAudioId = oldAudioId;
 
       if (image) {
-        const file = await postService.uploadImage(image);
-        newFileId = file.$id;
+        const uploadedImage = await postService.uploadImage(image, user?.$id);
+        nextImageId = uploadedImage?.$id || oldImageId;
 
-        if (oldImageId) {
+        if (oldImageId && nextImageId !== oldImageId) {
           await postService.deleteFile(oldImageId);
         }
       }
 
+      if (audio) {
+        const uploadedAudio = await postService.uploadAudio(audio, user?.$id);
+        nextAudioId = uploadedAudio?.$id || oldAudioId;
+
+        if (oldAudioId && nextAudioId !== oldAudioId) {
+          await postService.deleteFile(oldAudioId);
+        }
+      }
+
+      const resolvedTitle =
+        title.trim() || content.trim().split(/\s+/).slice(0, 6).join(" ") || "updated-post";
+
       await postService.updatePost(id, {
-        title,
+        title: resolvedTitle,
         content,
-        featuredImg: newFileId,
+        slug: createSlug(resolvedTitle) || `post-${Date.now()}`,
+        featuredImg: nextImageId,
+        audioId: nextAudioId,
       });
 
       navigate("/");
-    } catch (error) {
-      console.log("UPDATE ERROR:", error);
+    } catch {
+      setError("Update failed. Please try again.");
+    } finally {
+      setSaving(false);
     }
-  };
+  }
+
+  if (loading) {
+    return <PostSkeleton count={1} />;
+  }
+
+  const resolvedImagePreview = imagePreview || getFileUrl(oldImageId);
+  const resolvedAudioPreview = audioPreview || getFileUrl(oldAudioId);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 px-4">
-      <form
-        onSubmit={handleUpdate}
-        className="w-full max-w-xl bg-white dark:bg-slate-900 
-        border border-slate-200 dark:border-slate-800 
-        rounded-xl shadow-sm p-6 space-y-4"
+    <div className="flex min-h-[calc(100vh-7rem)] items-center justify-center py-4">
+      <UploadModal
+        title="Edit post"
+        description="Refine the caption, swap media, and keep the post looking polished."
+        onClose={() => navigate(-1)}
       >
-        <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">
-          Edit Post
-        </h2>
+        <form onSubmit={handleUpdate} className="grid gap-6 lg:grid-cols-[1fr,1.05fr]">
+          <div className="space-y-4">
+            <div className="overflow-hidden rounded-[28px] border border-white/10 bg-black/35 p-3">
+              {resolvedImagePreview ? (
+                <img
+                  src={resolvedImagePreview}
+                  alt="Preview"
+                  className="aspect-[4/5] w-full rounded-[22px] object-cover"
+                />
+              ) : (
+                <div className="flex aspect-[4/5] items-center justify-center rounded-[22px] bg-[radial-gradient(circle_at_top,_rgba(255,115,0,0.28),_transparent_45%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] px-10 text-center">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.3em] text-zinc-500">Preview</p>
+                    <h2 className="font-display mt-3 text-3xl text-white">{title || "Edit post"}</h2>
+                  </div>
+                </div>
+              )}
+            </div>
 
-        {/* Title */}
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full px-3 py-2 rounded-md 
-          bg-slate-50 dark:bg-slate-800 
-          border border-slate-200 dark:border-slate-700 
-          text-slate-800 dark:text-slate-100 
-          focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          placeholder="Title"
-        />
+            {resolvedAudioPreview ? (
+              <div className="rounded-[24px] border border-white/10 bg-black/35 p-3">
+                <p className="mb-2 text-xs uppercase tracking-[0.25em] text-zinc-500">Audio preview</p>
+                <div className="rounded-full bg-zinc-100 p-1">
+                  <audio controls className="w-full" src={resolvedAudioPreview} />
+                </div>
+              </div>
+            ) : null}
+          </div>
 
-        {/* Content */}
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          rows={6}
-          className="w-full px-3 py-2 rounded-md 
-          bg-slate-50 dark:bg-slate-800 
-          border border-slate-200 dark:border-slate-700 
-          text-slate-800 dark:text-slate-100 
-          focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
-          placeholder="Content"
-        />
+          <div className="space-y-4">
+            {error ? (
+              <div className="rounded-[22px] border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                {error}
+              </div>
+            ) : null}
 
-        {/* File */}
-        <input
-          type="file"
-          onChange={(e) => setImage(e.target.files[0])}
-          className="w-full text-sm text-slate-600 dark:text-slate-300
-          file:mr-4 file:py-2 file:px-4 
-          file:rounded-md file:border-0
-          file:bg-indigo-100 file:text-indigo-700
-          dark:file:bg-indigo-500/20 dark:file:text-indigo-300
-          hover:file:bg-indigo-200 dark:hover:file:bg-indigo-500/30"
-        />
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-zinc-300">Short title</span>
+              <input
+                type="text"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                className="w-full rounded-[22px] border border-white/10 bg-black/35 px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-white/20"
+                placeholder="Title"
+              />
+            </label>
 
-        {/* Button */}
-        <button
-          type="submit"
-          className="w-full py-2 rounded-md 
-          bg-emerald-500 text-white 
-          hover:bg-emerald-600 
-          active:scale-[0.98] transition"
-        >
-          Update Post
-        </button>
-      </form>
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-zinc-300">Caption</span>
+              <textarea
+                value={content}
+                onChange={(event) => setContent(event.target.value)}
+                rows={7}
+                className="w-full rounded-[24px] border border-white/10 bg-black/35 px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-white/20"
+                placeholder="Caption"
+              />
+            </label>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="cursor-pointer rounded-[24px] border border-white/10 bg-black/35 p-4 transition hover:border-white/20 hover:bg-white/5">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/8 text-zinc-200">
+                    <ImageIcon className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-white">Replace image</p>
+                    <p className="text-xs text-zinc-500">
+                      {image ? image.name : "Keep current image"}
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => setImage(event.target.files?.[0] || null)}
+                />
+              </label>
+
+              <label className="cursor-pointer rounded-[24px] border border-white/10 bg-black/35 p-4 text-zinc-100 transition hover:border-white/20 hover:bg-white/5">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/8 text-zinc-200">
+                    <AudioIcon className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-100">Replace audio</p>
+                    <p className="text-xs text-zinc-400">
+                      {audio ? audio.name : "Keep current audio"}
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="file"
+                  accept="audio/*"
+                  className="hidden"
+                  onChange={(event) => setAudio(event.target.files?.[0] || null)}
+                />
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              disabled={saving}
+              className="w-full rounded-full bg-zinc-100 px-5 py-3 text-sm font-semibold !text-zinc-950 transition hover:bg-zinc-200 hover:!text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? "Saving..." : "Save changes"}
+            </button>
+          </div>
+        </form>
+      </UploadModal>
     </div>
   );
 }

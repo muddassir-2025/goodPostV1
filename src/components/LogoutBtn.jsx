@@ -1,23 +1,23 @@
 import { useDispatch } from "react-redux";
-import { logout } from "../features/auth/authSlice";
+import { useNavigate } from "react-router-dom";
 import authService from "../appwrite/auth";
+import { logout } from "../features/auth/authSlice";
 
 export default function LogoutBtn() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
-  const handleLogout = async () => {
+  async function handleLogout() {
     await authService.logout();
     dispatch(logout());
-  };
+    navigate("/");
+  }
 
   return (
     <button
+      type="button"
       onClick={handleLogout}
-      className="px-3 py-1 rounded-md 
-      bg-rose-100 text-rose-600 
-      dark:bg-rose-500/20 dark:text-rose-300 
-      hover:bg-rose-200 dark:hover:bg-rose-500/30 
-      active:scale-95 transition"
+      className="rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/5 hover:text-white"
     >
       Logout
     </button>

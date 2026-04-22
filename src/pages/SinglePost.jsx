@@ -1,373 +1,392 @@
-import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useSelector } from "react-redux";
-import postService from "../appwrite/post";
+import Avatar from "../components/Avatar";
+import CommentSection from "../components/CommentSection";
+import EmptyState from "../components/EmptyState";
+import FavoriteButton from "../components/FavoriteButton";
+import LikeButton from "../components/LikeButton";
+import PostSkeleton from "../components/PostSkeleton";
+import {
+  ArrowLeftIcon,
+  CommentIcon,
+  EditIcon,
+  TrashIcon,
+} from "../components/ui/Icons";
 import commentService from "../appwrite/comment";
-import likeService from "../appwrite/like";
 import favoriteService from "../appwrite/favorite";
+import likeService from "../appwrite/like";
+import postService from "../appwrite/post";
+import { syncFavorite, syncLike } from "../lib/engagement";
+import { formatRelativeTime, getFileUrl, getHandle } from "../lib/ui";
 
 export default function SinglePost() {
   const { slug } = useParams();
+  const user = useSelector((state) => state.auth.userData);
+  const navigate = useNavigate();
+  const commentsRef = useRef(null);
 
   const [post, setPost] = useState(null);
-
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
-
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
-
-  const [likeLoading, setLikeLoading] = useState(false);
-
-  const [fav, setFav] = useState(false);
-  const [favId, setFavId] = useState(null);
-
-  const user = useSelector((state) => state.auth.userData);
-
-  // 🔹 Fetch post
   useEffect(() => {
-    const fetchPost = async () => {
+    let active = true;
+
+    async function loadPost() {
+      setLoading(true);
+      setError("");
+
       try {
-        const res = await postService.getPost(slug);
-        if (res) setPost(res);
-      } catch (err) {
-        console.log("Post fetch error:", err);
-      }
-    };
+        const resolvedPost = await postService.getPost(slug);
 
-    fetchPost();
-  }, [slug]);
-
-  // 🔹 Fetch comments
-  useEffect(() => {
-    if (!post) return;
-
-    const fetchComments = async () => {
-      try {
-        const res = await commentService.getComments(post.$id);
-        setComments(res || []);
-      } catch (err) {
-        console.log("Comments error:", err);
-      }
-    };
-
-    fetchComments();
-  }, [post]);
-
-  // 🔹 Fetch likes
-  useEffect(() => {
-    if (!post) return;
-
-    const fetchLikes = async () => {
-      try {
-        const res = await likeService.countLikes(post.$id);
-        setLikeCount(res?.total || 0);
-
-        if (user) {
-          const check = await likeService.getUserLike(post.$id, user.$id);
-          setLiked(check?.total > 0);
+        if (!resolvedPost) {
+          if (active) {
+            setPost(null);
+            setComments([]);
+            setError("This post could not be found.");
+          }
+          return;
         }
-      } catch (err) {
-        console.log("Likes fetch error:", err);
+
+        const [resolvedComments, likesCount, likedRes, favoriteRes] = await Promise.all([
+          commentService.getComments(resolvedPost.$id),
+          likeService.countLikes(resolvedPost.$id),
+          user ? likeService.getUserLike(resolvedPost.$id, user.$id) : Promise.resolve(null),
+          user
+            ? favoriteService.getUserFavorite(user.$id, resolvedPost.$id)
+            : Promise.resolve(null),
+        ]);
+
+        if (active) {
+          const safeComments = resolvedComments || [];
+
+          setPost({
+            ...resolvedPost,
+            likeCount: likesCount?.total || resolvedPost.likeCount || 0,
+            commentCount: safeComments.length,
+            liked: likedRes?.total > 0,
+            saved: favoriteRes?.total > 0,
+            favoriteId: favoriteRes?.documents?.[0]?.$id || null,
+          });
+          setComments(safeComments);
+        }
+      } catch {
+        if (active) {
+          setError("We couldn't load this post.");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
       }
-    };
-
-    fetchLikes();
-  }, [post, user]);
-
-  // favorite check :
-  useEffect(() => {
-    if (!user || !post) return;
-
-    const checkFav = async () => {
-      const res = await favoriteService.getUserFavorite(user.$id, post.$id);
-
-      if (res.total > 0) {
-        setFav(true);
-        setFavId(res.documents[0].$id);
-      }
-    };
-
-    checkFav();
-  }, [user, post]);
-
-  // favorite toggle :
-  const handleFavorite = async () => {
-  console.log("CLICKED");
-
-  if (!user) return alert("Login first");
-
-  // 🔥 TEMP: force toggle
-  setFav((prev) => !prev);
-
-  try {
-    if (fav) {
-      await favoriteService.removeFavorite(favId);
-      setFavId(null);
-    } else {
-      const res = await favoriteService.addFavorite(user.$id, post.$id);
-      console.log("RES:", res);
-      setFavId(res?.$id);
     }
-  } catch (err) {
-    console.log("Favorite error:", err);
+
+    loadPost();
+    return () => {
+      active = false;
+    };
+  }, [slug, user]);
+
+  if (loading) {
+    return <PostSkeleton count={1} />;
   }
-};
 
+  if (!post) {
+    return (
+      <EmptyState
+        eyebrow="Post"
+        title="Post unavailable"
+        description={error || "The post was removed or the link is no longer valid."}
+        actionLabel="Back to feed"
+        actionTo="/"
+      />
+    );
+  }
 
-  // 🔹 Add comment
-  const handleAddComment = async () => {
-    if (!user) return alert("Please login first");
-    if (!newComment.trim()) return;
+  const isOwner = user?.$id === post.authorID;
+  const imageSrc = getFileUrl(post.featuredImg);
+  const audioSrc = getFileUrl(post.audioId);
+
+  async function handleLikeToggle() {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    const previous = { liked: post.liked, likeCount: post.likeCount };
+    const nextLiked = !post.liked;
+
+    setPost((current) => ({
+      ...current,
+      liked: nextLiked,
+      likeCount: Math.max((current.likeCount || 0) + (nextLiked ? 1 : -1), 0),
+    }));
+
+    try {
+      await syncLike({
+        postId: post.$id,
+        userId: user.$id,
+        currentlyLiked: previous.liked,
+      });
+    } catch {
+      setPost((current) => ({
+        ...current,
+        liked: previous.liked,
+        likeCount: previous.likeCount,
+      }));
+    }
+  }
+
+  async function handleFavoriteToggle() {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    const previous = { saved: post.saved, favoriteId: post.favoriteId };
+    const nextSaved = !post.saved;
+
+    setPost((current) => ({
+      ...current,
+      saved: nextSaved,
+      favoriteId: nextSaved ? current.favoriteId : null,
+    }));
+
+    try {
+      const result = await syncFavorite({
+        postId: post.$id,
+        userId: user.$id,
+        currentlySaved: previous.saved,
+        favoriteId: previous.favoriteId,
+      });
+
+      setPost((current) => ({
+        ...current,
+        saved: result.saved,
+        favoriteId: result.favoriteId,
+      }));
+    } catch {
+      setPost((current) => ({
+        ...current,
+        saved: previous.saved,
+        favoriteId: previous.favoriteId,
+      }));
+    }
+  }
+
+  async function handleDeletePost() {
+    if (!window.confirm("Delete this post?")) {
+      return;
+    }
+
+    try {
+      if (post.featuredImg) {
+        await postService.deleteFile(post.featuredImg);
+      }
+
+      if (post.audioId) {
+        await postService.deleteFile(post.audioId);
+      }
+
+      await postService.deletePost(post.$id);
+      navigate("/");
+    } catch {
+      setError("Delete failed. Please try again.");
+    }
+  }
+
+  async function handleAddComment() {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    if (!newComment.trim()) {
+      return;
+    }
 
     try {
       await commentService.createComment({
         postId: post.$id,
         userId: user.$id,
         userName: user.name,
-        content: newComment,
+        content: newComment.trim(),
       });
-
-      setNewComment("");
 
       const updated = await commentService.getComments(post.$id);
       setComments(updated || []);
-    } catch (err) {
-      console.log("Add comment error:", err);
+      setPost((current) => ({
+        ...current,
+        commentCount: (updated || []).length,
+      }));
+      setNewComment("");
+    } catch {
+      setError("Comment could not be posted.");
     }
-  };
+  }
 
-  // 🔹 Like / Unlike
-  const handleLike = async () => {
-    if (likeLoading) return;
-    if (!user) return alert("Please login first");
-
-    setLikeLoading(true);
-
-    try {
-      const existing = await likeService.getUserLike(post.$id, user.$id);
-
-      if (existing?.total > 0 && existing.documents.length > 0) {
-        await likeService.deleteLike(existing.documents[0].$id);
-        setLiked(false);
-        setLikeCount((prev) => Math.max(prev - 1, 0));
-      } else {
-        await likeService.createLike({
-          postId: post.$id,
-          userId: user.$id,
-        });
-        setLiked(true);
-        setLikeCount((prev) => prev + 1);
-      }
-    } catch (err) {
-      console.log("Like error:", err);
-    }
-
-    setLikeLoading(false);
-  };
-
-  // 🔹 Edit comment
-  const handleEdit = (comment) => {
+  function handleEditStart(comment) {
     setEditingId(comment.$id);
     setEditText(comment.content);
-  };
+  }
 
-  const handleSave = async () => {
-    if (!editText.trim()) return;
+  async function handleEditSave() {
+    if (!editText.trim()) {
+      return;
+    }
 
     try {
       await commentService.updateComment(editingId, {
-        content: editText,
+        content: editText.trim(),
       });
 
       const updated = await commentService.getComments(post.$id);
       setComments(updated || []);
-
       setEditingId(null);
       setEditText("");
-    } catch (err) {
-      console.log("Edit error:", err);
+    } catch {
+      setError("Comment update failed.");
     }
-  };
-
-  // 🔹 Delete comment
-  const handleDelete = async (commentId) => {
-    try {
-      await commentService.deleteComment(commentId);
-
-      const updated = await commentService.getComments(post.$id);
-      setComments(updated || []);
-    } catch (err) {
-      console.log("Delete error:", err);
-    }
-  };
-
-  // 🔹 Loading
-  if (!post) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-300">
-        Loading post...
-      </div>
-    );
   }
 
-
+  async function handleDeleteComment(commentId) {
+    try {
+      await commentService.deleteComment(commentId, post.$id);
+      const updated = await commentService.getComments(post.$id);
+      setComments(updated || []);
+      setPost((current) => ({
+        ...current,
+        commentCount: (updated || []).length,
+      }));
+    } catch {
+      setError("Comment delete failed.");
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 px-4 py-6">
-      {/* Post Card */}
-      <div className="max-w-3xl mx-auto bg-white dark:bg-slate-900 
-        border border-slate-200 dark:border-slate-800 
-        rounded-xl p-6 shadow-sm"
-      >
-        <p className="text-sm text-green-600 dark:text-green-400 mb-2">
-          By: {post.authorName}
-        </p>
+    <div className="space-y-5">
+      {error ? (
+        <div className="rounded-[26px] border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          {error}
+        </div>
+      ) : null}
 
-        <h1 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">
-          {post.title}
-        </h1>
+      <article className="overflow-hidden rounded-[32px] border border-white/10 bg-[#121212]/92 shadow-[0_30px_90px_rgba(0,0,0,0.34)]">
+        <div className="border-b border-white/10 p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-zinc-300 transition hover:border-white/20 hover:text-white"
+                aria-label="Go back"
+              >
+                <ArrowLeftIcon className="h-5 w-5" />
+              </button>
 
-        <p className="mt-3 text-slate-600 dark:text-slate-300">
-          {post.content}
-        </p>
+              <div className="flex items-center gap-3">
+                <Avatar name={post.authorName} size="md" ring />
+                <div>
+                  <p className="font-semibold text-white">{getHandle(post.authorName)}</p>
+                  <p className="text-xs text-zinc-500">{formatRelativeTime(post.$createdAt)}</p>
+                </div>
+              </div>
+            </div>
 
-        {post.featuredImg && (
+            {isOwner ? (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate(`/edit/${post.$id}`)}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 transition hover:border-white/20 hover:text-white"
+                >
+                  <EditIcon className="h-4 w-4" />
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeletePost}
+                  className="inline-flex items-center gap-2 rounded-full border border-rose-500/20 px-4 py-2 text-sm text-rose-300 transition hover:bg-rose-500/10"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  Delete
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        {imageSrc ? (
           <img
-            src={`https://fra.cloud.appwrite.io/v1/storage/buckets/${import.meta.env.VITE_APPWRITE_BUCKET_ID}/files/${post.featuredImg}/view?project=${import.meta.env.VITE_APPWRITE_PROJECT_ID}`}
-            alt="post"
-            className="mt-4 rounded-lg max-w-sm border border-slate-200 dark:border-slate-700"
+            src={imageSrc}
+            alt={post.title}
+            className="aspect-[4/5] w-full object-cover"
           />
+        ) : (
+          <div className="flex aspect-[4/5] items-end bg-[radial-gradient(circle_at_top,_rgba(255,115,0,0.28),_transparent_45%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] p-6">
+            <div>
+              <p className="text-xs uppercase tracking-[0.32em] text-zinc-500">Feature</p>
+              <h1 className="font-display mt-3 text-4xl text-white">{post.title}</h1>
+            </div>
+          </div>
         )}
 
-        {/* AUDIO */}
-        <audio
-          controls
-          className="mt-2 w-full"
-          src={`https://fra.cloud.appwrite.io/v1/storage/buckets/${import.meta.env.VITE_APPWRITE_BUCKET_ID}/files/${post.audioId}/view?project=${import.meta.env.VITE_APPWRITE_PROJECT_ID}`}
-        />
-
-        {/* Like */}
-        <div className="mt-4 flex items-center gap-2 text-sm">
-          <button
-            onClick={handleLike}
-            disabled={likeLoading}
-            className="flex items-center gap-1 text-gray-600 dark:text-gray-300 hover:text-rose-500 transition"
-          >
-            <span className="text-base">
-              {liked ? "👍🏼" : "👎🏼"}
-            </span>
-            <span>{likeCount}</span>
-          </button>
-        </div>
-
-        {/* <button onClick={handleFavorite} className="text-xl">
-          {fav ? "❤️" : "🤍"}
-        </button> */}
-
-        <button
-          onClick={() => {
-            console.log("FAV CLICKED");   // 👈 add this
-            handleFavorite();
-          }}
-          className="text-xl"
-        >
-          {fav ? "❤️" : "🤍"}
-        </button>
-
-      </div>
-
-      {/* Comment Box */}
-      <div className="max-w-3xl mx-auto mt-6">
-        <div className="flex gap-2">
-          <input
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Write a comment..."
-            className="flex-1 px-3 py-2 rounded-md 
-            bg-white dark:bg-slate-900 
-            border border-slate-200 dark:border-slate-800 
-            text-slate-800 dark:text-slate-100 
-            focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          />
-
-          <button
-            onClick={handleAddComment}
-            className="px-4 py-2 rounded-md 
-            bg-indigo-500 text-white 
-            hover:bg-indigo-600 transition"
-          >
-            Post
-          </button>
-        </div>
-
-        {/* Comments */}
-        <div className="mt-6 space-y-3">
-          {comments.map((c) => (
-            <div
-              key={c.$id}
-              className="p-3 rounded-md bg-white dark:bg-slate-900 
-              border border-slate-200 dark:border-slate-800"
+        <div className="p-4 sm:p-5">
+          <div className="flex items-center gap-2">
+            <LikeButton liked={post.liked} count={post.likeCount} onToggle={handleLikeToggle} />
+            <button
+              type="button"
+              onClick={() => commentsRef.current?.scrollIntoView({ behavior: "smooth" })}
+              className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5 hover:text-white"
             >
-              <b className="text-slate-800 dark:text-slate-100">
-                {c.userName}
-              </b>
+              <CommentIcon className="h-5 w-5" />
+              <span>{post.commentCount}</span>
+            </button>
+            <FavoriteButton
+              saved={post.saved}
+              onToggle={handleFavoriteToggle}
+              className="ml-auto"
+            />
+          </div>
 
-              {editingId === c.$id ? (
-                <div className="mt-2 flex gap-2">
-                  <input
-                    value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
-                    className="flex-1 px-2 py-1 rounded-md 
-                    bg-slate-50 dark:bg-slate-800 
-                    border border-slate-200 dark:border-slate-700"
-                  />
+          <div className="mt-5">
+            <h1 className="font-display text-3xl text-white">{post.title}</h1>
+            <p className="mt-3 text-sm leading-7 text-zinc-300">{post.content}</p>
+          </div>
 
-                  <button
-                    onClick={handleSave}
-                    className="px-3 py-1 rounded-md bg-green-500 text-white"
-                  >
-                    Save
-                  </button>
-
-                  <button
-                    onClick={() => setEditingId(null)}
-                    className="px-3 py-1 rounded-md bg-slate-300 dark:bg-slate-700"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <p className="text-slate-600 dark:text-slate-300 mt-1">
-                    {c.content}
-                  </p>
-
-                  {user && user.$id === c.userId && (
-                    <div className="flex gap-2 mt-2 text-sm">
-                      <button
-                        onClick={() => handleEdit(c)}
-                        className="text-indigo-500"
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        onClick={() => handleDelete(c.$id)}
-                        className="text-rose-500"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
+          {audioSrc ? (
+            <div className="mt-5 rounded-[26px] border border-white/8 bg-black/40 p-3">
+              <div className="rounded-full bg-zinc-100 p-1">
+                <audio controls className="w-full" src={audioSrc} />
+              </div>
             </div>
-          ))}
+          ) : null}
         </div>
+      </article>
+
+      <div ref={commentsRef}>
+        <CommentSection
+          comments={comments}
+          currentUserId={user?.$id}
+          value={newComment}
+          onChange={setNewComment}
+          onSubmit={handleAddComment}
+          editingId={editingId}
+          editValue={editText}
+          onEditChange={setEditText}
+          onEditStart={handleEditStart}
+          onEditSave={handleEditSave}
+          onEditCancel={() => {
+            setEditingId(null);
+            setEditText("");
+          }}
+          onDelete={handleDeleteComment}
+        />
       </div>
     </div>
   );
