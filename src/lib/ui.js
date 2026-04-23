@@ -142,3 +142,17 @@ export function buildStories(posts = [], user) {
 
   return stories.slice(0, 8);
 }
+
+const FORBIDDEN_WORDS = [
+  "fuck", "shit", "bitch", "asshole", "cunt", "dick", "pussy", "whore", "slut", "bastard"
+];
+
+export function containsForbiddenWord(text) {
+  if (!text) return false;
+  const lowerText = text.toLowerCase();
+  return FORBIDDEN_WORDS.some(word => {
+    const regex = new RegExp(`\\b${word}\\b`, 'i');
+    return regex.test(lowerText);
+  });
+}
+

@@ -7,6 +7,8 @@ import PostSkeleton from "../components/PostSkeleton";
 import EmptyState from "../components/EmptyState";
 
 import { fetchFeedPosts } from "../lib/posts";
+import { syncFavorite, syncLike } from "../lib/engagement";
+import postService from "../appwrite/post";
 
 export default function TagFeed() {
   const { tag } = useParams();
@@ -46,37 +48,98 @@ export default function TagFeed() {
     };
   }, [tag, user]);
 
-  // ✅ LIKE (dummy logic - replace with Appwrite later)
-  const handleToggleLike = (post) => {
+  // ✅ LIKE
+  const handleToggleLike = async (post) => {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    const nextLiked = !post.liked;
+
     setPosts((prev) =>
       prev.map((p) =>
         p.$id === post.$id
           ? {
               ...p,
-              liked: !p.liked,
-              likeCount: p.liked
-                ? (p.likeCount || 1) - 1
-                : (p.likeCount || 0) + 1,
+              liked: nextLiked,
+              likeCount: Math.max((p.likeCount || 0) + (nextLiked ? 1 : -1), 0),
             }
           : p
       )
     );
+
+    try {
+      await syncLike({
+        postId: post.$id,
+        userId: user.$id,
+        currentlyLiked: post.liked,
+      });
+    } catch {
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.$id === post.$id
+            ? { ...p, liked: post.liked, likeCount: post.likeCount || 0 }
+            : p
+        )
+      );
+    }
   };
 
   // ✅ SAVE / FAVORITE
-  const handleToggleFavorite = (post) => {
+  const handleToggleFavorite = async (post) => {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    const nextSaved = !post.saved;
+
     setPosts((prev) =>
       prev.map((p) =>
         p.$id === post.$id
-          ? { ...p, saved: !p.saved }
+          ? { ...p, saved: nextSaved, favoriteId: nextSaved ? p.favoriteId : null }
           : p
       )
     );
+
+    try {
+      const result = await syncFavorite({
+        postId: post.$id,
+        userId: user.$id,
+        currentlySaved: post.saved,
+        favoriteId: post.favoriteId,
+      });
+
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.$id === post.$id
+            ? { ...p, saved: result.saved, favoriteId: result.favoriteId }
+            : p
+        )
+      );
+    } catch {
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.$id === post.$id
+            ? { ...p, saved: post.saved, favoriteId: p.favoriteId || null }
+            : p
+        )
+      );
+    }
   };
 
   // ✅ DELETE
-  const handleDelete = (post) => {
-    setPosts((prev) => prev.filter((p) => p.$id !== post.$id));
+  const handleDelete = async (post) => {
+    try {
+      if (post.featuredImg) await postService.deleteFile(post.featuredImg);
+      if (post.audioId) await postService.deleteFile(post.audioId);
+      await postService.deletePost(post.$id);
+
+      setPosts((prev) => prev.filter((p) => p.$id !== post.$id));
+    } catch (err) {
+      console.error("Delete failed:", err);
+    }
   };
 
   return (

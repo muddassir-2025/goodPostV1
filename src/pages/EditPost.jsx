@@ -5,7 +5,7 @@ import PostSkeleton from "../components/PostSkeleton";
 import UploadModal from "../components/UploadModal";
 import { AudioIcon, ImageIcon } from "../components/ui/Icons";
 import postService from "../appwrite/post";
-import { createSlug, getFileUrl } from "../lib/ui";
+import { createSlug, getFileUrl, containsForbiddenWord } from "../lib/ui";
 
 export default function EditPost() {
   const { id } = useParams();
@@ -82,6 +82,11 @@ export default function EditPost() {
   async function handleUpdate(event) {
     event.preventDefault();
     setError("");
+
+    if (containsForbiddenWord(title) || containsForbiddenWord(content)) {
+      return setError("Post cannot be updated. It contains inappropriate language.");
+    }
+
     setSaving(true);
 
     try {

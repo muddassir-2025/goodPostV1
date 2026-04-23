@@ -4,7 +4,7 @@ import { useSelector } from "react-redux";
 import UploadModal from "../components/UploadModal";
 import { AudioIcon, ImageIcon } from "../components/ui/Icons";
 import postService from "../appwrite/post";
-import { createSlug } from "../lib/ui";
+import { createSlug, containsForbiddenWord } from "../lib/ui";
 
 export default function CreatePost() {
   const user = useSelector((state) => state.auth.userData);
@@ -48,6 +48,10 @@ export default function CreatePost() {
     if (!user) return setError("Please log in before creating a post.");
     if (!content.trim()) return setError("Please add a caption before publishing.");
     if (!selectedTags.length) return setError("Select at least one tag.");
+
+    if (containsForbiddenWord(title) || containsForbiddenWord(content)) {
+      return setError("Post cannot be created. It contains inappropriate language.");
+    }
 
     setLoading(true);
 
