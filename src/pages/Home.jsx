@@ -153,7 +153,7 @@ export default function Home() {
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[#121212]/90 p-5 shadow-[0_30px_90px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+      <section className="overflow-hidden rounded-\[32px] border border-white/10 bg-[#121212]/90 p-5 shadow-[0_30px_90px_rgba(0,0,0,0.34)] backdrop-blur-xl">
         <p className="text-xs uppercase tracking-[0.32em] text-zinc-500">Feed</p>
         <div className="mt-3 flex items-start justify-between gap-4">
           <div>
@@ -166,7 +166,7 @@ export default function Home() {
 
           <Link
             to={user ? "/create" : "/login"}
-            className="hidden rounded-full bg-zinc-100 px-4 py-2 text-sm font-semibold !text-zinc-950 transition hover:bg-zinc-200 hover:!text-zinc-950 sm:inline-flex"
+            className="hidden rounded-full bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-zinc-200 sm:inline-flex"
           >
             Share
           </Link>
@@ -195,7 +195,7 @@ export default function Home() {
               onClick={() => setFilter(item.id)}
               className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                 filter === item.id
-                  ? "bg-zinc-100 !text-zinc-950"
+                  ? "bg-white text-black"
                   : "border border-white/10 bg-white/5 text-zinc-400 hover:border-white/20 hover:text-white"
               }`}
             >

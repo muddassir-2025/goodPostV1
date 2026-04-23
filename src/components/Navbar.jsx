@@ -32,11 +32,15 @@ export default function Navbar() {
     <header className="fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-black/72 backdrop-blur-xl">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-3 py-3 sm:px-5">
         <Link to="/" className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-[18px] bg-gradient-to-br from-fuchsia-500 via-rose-500 to-amber-400 shadow-lg shadow-rose-500/20">
-            <span className="font-display text-lg text-black">M</span>
-          </div>
+        <div className="h-11 w-11 overflow-hidden rounded-2xl bg-black shadow-lg shadow-rose-500/20 ring-1 ring-white/10">
+  <img
+    src="/GoodPost.svg"
+    alt="logo"
+    className="h-full w-full object-cover"
+  />
+</div>
           <div>
-            <p className="font-display text-lg tracking-wide text-white">Moments</p>
+            <p className="font-display text-lg tracking-wide text-white">GoodPost</p>
             <p className="hidden text-xs text-zinc-500 sm:block">Photo and audio journaling</p>
           </div>
         </Link>

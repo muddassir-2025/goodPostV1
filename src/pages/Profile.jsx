@@ -93,24 +93,51 @@ export default function Profile() {
 
             <p className="mt-4 max-w-xl text-sm leading-6 text-zinc-400">{bio}</p>
 
-            <div className="mt-5 grid grid-cols-4 gap-3">
-              <div className="rounded-[24px] border border-white/10 bg-black/35 px-4 py-3 text-center">
-                <p className="font-display text-xl text-white">{formatCompactNumber(posts.length)}</p>
-                <p className="mt-1 text-xs uppercase tracking-[0.22em] text-zinc-500">Posts</p>
-              </div>
-              <div className="rounded-[24px] border border-white/10 bg-black/35 px-4 py-3 text-center">
-                <p className="font-display text-xl text-white">{formatCompactNumber(followers)}</p>
-                <p className="mt-1 text-xs uppercase tracking-[0.22em] text-zinc-500">Followers</p>
-              </div>
-              <div className="rounded-[24px] border border-white/10 bg-black/35 px-4 py-3 text-center">
-                <p className="font-display text-xl text-white">{formatCompactNumber(following)}</p>
-                <p className="mt-1 text-xs uppercase tracking-[0.22em] text-zinc-500">Following</p>
-              </div>
-              <div className="rounded-[24px] border border-white/10 bg-black/35 px-4 py-3 text-center">
-                <p className="font-display text-xl text-white">{formatCompactNumber(savedCount)}</p>
-                <p className="mt-1 text-xs uppercase tracking-[0.22em] text-zinc-500">Saved</p>
-              </div>
-            </div>
+           <div className="mt-5 flex items-center rounded-[24px] border border-white/10 bg-black/35 py-4">
+  
+  <div className="flex-1 text-center">
+    <p className="font-display text-lg text-white">
+      {formatCompactNumber(posts.length)}
+    </p>
+    <p className="mt-1 text-[10px] uppercase tracking-[0.1em] text-zinc-500">
+      Posts
+    </p>
+  </div>
+
+  <div className="w-px self-stretch bg-white/10"></div>
+
+  <div className="flex-1 text-center">
+    <p className="font-display text-lg text-white">
+      {formatCompactNumber(followers)}
+    </p>
+    <p className="mt-1 text-[10px] uppercase tracking-[0.1em] text-zinc-500">
+      Followers
+    </p>
+  </div>
+
+  <div className="w-px self-stretch bg-white/10"></div>
+
+  <div className="flex-1 text-center">
+    <p className="font-display text-lg text-white">
+      {formatCompactNumber(following)}
+    </p>
+    <p className="mt-1 text-[10px] uppercase tracking-[0.1em] text-zinc-500">
+      Following
+    </p>
+  </div>
+
+  <div className="w-px self-stretch bg-white/10"></div>
+
+  <div className="flex-1 text-center">
+    <p className="font-display text-lg text-white">
+      {formatCompactNumber(savedCount)}
+    </p>
+    <p className="mt-1 text-[10px] uppercase tracking-[0.1em] text-zinc-500">
+      Saved
+    </p>
+  </div>
+
+</div>
           </div>
         </div>
       </section>
@@ -133,23 +160,25 @@ export default function Profile() {
 
               return (
                 <Link
-                  key={post.$id}
-                  to={`/post/${post.slug}`}
-                  className="group overflow-hidden rounded-[24px] border border-white/10 bg-black/35"
-                >
-                  {imageSrc ? (
-                    <img
-                      src={imageSrc}
-                      alt={post.title}
-                      loading="lazy"
-                      className="aspect-square w-full object-cover transition duration-500 group-hover:scale-[1.04]"
-                    />
-                  ) : (
-                    <div className="flex aspect-square items-end bg-[radial-gradient(circle_at_top,_rgba(255,115,0,0.28),_transparent_45%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] p-3">
-                      <p className="font-display text-lg text-white">{post.title}</p>
-                    </div>
-                  )}
-                </Link>
+  key={post.$id}
+  to={`/post/${post.slug}`}
+  className="group overflow-hidden rounded-[24px] border border-white/10 bg-black/35"
+>
+  <div className="aspect-square overflow-hidden">
+    {imageSrc ? (
+      <img
+        src={imageSrc}
+        alt={post.title}
+        loading="lazy"
+        className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+      />
+    ) : (
+      <div className="flex h-full items-end bg-[radial-gradient(circle_at_top,_rgba(255,115,0,0.28),_transparent_45%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] p-3">
+        <p className="font-display text-lg text-white">{post.title}</p>
+      </div>
+    )}
+  </div>
+</Link>
               );
             })}
           </div>

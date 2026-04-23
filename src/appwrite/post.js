@@ -105,6 +105,7 @@ class PostService {
       );
     } catch (error) {
       console.log("delete post error: ", error);
+      throw error;
     }
   }
 

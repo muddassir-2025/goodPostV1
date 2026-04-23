@@ -18,6 +18,8 @@ import Search from "./pages/Search";
 import Signup from "./pages/Signup";
 import SinglePost from "./pages/SinglePost";
 
+import ConfirmPopup from "./components/ConfirmPopup";
+
 function App() {
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(true);
@@ -47,6 +49,10 @@ function App() {
 
   return (
     <BrowserRouter>
+
+      {/* ✅ GLOBAL POPUP (must be here) */}
+    <ConfirmPopup />
+    
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />

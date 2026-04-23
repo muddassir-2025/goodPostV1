@@ -20,6 +20,8 @@ import postService from "../appwrite/post";
 import { syncFavorite, syncLike } from "../lib/engagement";
 import { formatRelativeTime, getFileUrl, getHandle } from "../lib/ui";
 
+import { confirm } from "../confirmService"; 
+
 export default function SinglePost() {
   const { slug } = useParams();
   const user = useSelector((state) => state.auth.userData);
@@ -33,6 +35,7 @@ export default function SinglePost() {
   const [editText, setEditText] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -180,9 +183,12 @@ export default function SinglePost() {
   }
 
   async function handleDeletePost() {
-    if (!window.confirm("Delete this post?")) {
-      return;
-    }
+    // if (!window.confirm("Delete this post?")) {
+    //   return;
+    // }
+
+    const ok = await confirm("Delete this post?");
+    if (!ok) return;
 
     try {
       if (post.featuredImg) {
@@ -269,6 +275,7 @@ export default function SinglePost() {
   }
 
   return (
+
     <div className="space-y-5">
       {error ? (
         <div className="rounded-[26px] border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
@@ -282,14 +289,14 @@ export default function SinglePost() {
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => navigate(-1)}
+                onClick={() => navigate("/")} //-1 fixed
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-zinc-300 transition hover:border-white/20 hover:text-white"
                 aria-label="Go back"
               >
                 <ArrowLeftIcon className="h-5 w-5" />
               </button>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <Avatar name={post.authorName} size="md" ring />
                 <div>
                   <p className="font-semibold text-white">{getHandle(post.authorName)}</p>
@@ -299,11 +306,11 @@ export default function SinglePost() {
             </div>
 
             {isOwner ? (
-              <div className="flex gap-2">
+              <div className="flex gap-1">
                 <button
                   type="button"
                   onClick={() => navigate(`/edit/${post.$id}`)}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 transition hover:border-white/20 hover:text-white"
+                  className="inline-flex items-center gap-0 rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 transition hover:border-white/20 hover:text-white"
                 >
                   <EditIcon className="h-4 w-4" />
                   Edit
@@ -311,7 +318,7 @@ export default function SinglePost() {
                 <button
                   type="button"
                   onClick={handleDeletePost}
-                  className="inline-flex items-center gap-2 rounded-full border border-rose-500/20 px-4 py-2 text-sm text-rose-300 transition hover:bg-rose-500/10"
+                  className="inline-flex items-center gap-0 rounded-full border border-rose-500/20 px-4 py-2 text-[10px] text-rose-300 transition hover:bg-rose-500/10"
                 >
                   <TrashIcon className="h-4 w-4" />
                   Delete
@@ -325,7 +332,7 @@ export default function SinglePost() {
           <img
             src={imageSrc}
             alt={post.title}
-            className="aspect-[4/5] w-full object-cover"
+            className="w-full max-h-[450px] object-contain bg-zinc-900"
           />
         ) : (
           <div className="flex aspect-[4/5] items-end bg-[radial-gradient(circle_at_top,_rgba(255,115,0,0.28),_transparent_45%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] p-6">

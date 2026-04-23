@@ -130,10 +130,10 @@ export default function PostCard({
               src={imageSrc}
               alt={post.title}
               loading="lazy"
-              className="aspect-[4/5] w-full object-cover transition duration-500 group-hover:scale-[1.015]"
+              className="w-full max-h-[450px] object-contain bg-zinc-900"
             />
           ) : (
-            <div className="flex aspect-[4/5] items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(255,115,0,0.28),_transparent_48%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] px-10 text-center">
+            <div className="flex aspect-4/5 items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(255,115,0,0.28),_transparent_48%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] px-10 text-center">
               <div>
                 <p className="text-xs uppercase tracking-[0.3em] text-zinc-500">Audio drop</p>
                 <h3 className="font-display mt-3 text-3xl text-white">{post.title}</h3>
