@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useSelector } from "react-redux";
 import Avatar from "../components/Avatar";
 import EmptyState from "../components/EmptyState";
@@ -9,7 +9,11 @@ import { fetchFeedPosts } from "../lib/posts";
 import { formatCompactNumber, getFileUrl, getHandle } from "../lib/ui";
 
 export default function Profile() {
-  const user = useSelector((state) => state.auth.userData);
+  const currentUser = useSelector((state) => state.auth.userData);
+  const { id } = useParams();
+
+  const isOwnProfile = !id || id === currentUser?.$id;
+
   const [posts, setPosts] = useState([]);
   const [savedCount, setSavedCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -18,7 +22,7 @@ export default function Profile() {
     let active = true;
 
     async function loadProfile() {
-      if (!user) {
+      if (!currentUser) {
         setLoading(false);
         return;
       }
@@ -27,18 +31,27 @@ export default function Profile() {
 
       try {
         const [feedPosts, favoriteRes] = await Promise.all([
-          fetchFeedPosts(user),
-          favoriteService.getUSerAllFavorites(user.$id),
+          fetchFeedPosts(currentUser),
+          favoriteService.getUSerAllFavorites(currentUser.$id),
         ]);
 
+        const targetUserId = isOwnProfile ? currentUser.$id : id;
+
+        const userPosts = feedPosts.filter(
+          (post) => post.authorID === targetUserId
+        );
+
         if (active) {
-          setPosts(feedPosts.filter((post) => post.authorID === user.$id));
-          setSavedCount(favoriteRes?.documents?.length || 0);
+          setPosts(userPosts);
+
+          if (isOwnProfile) {
+            setSavedCount(favoriteRes?.documents?.length || 0);
+          } else {
+            setSavedCount(0);
+          }
         }
       } finally {
-        if (active) {
-          setLoading(false);
-        }
+        if (active) setLoading(false);
       }
     }
 
@@ -46,9 +59,9 @@ export default function Profile() {
     return () => {
       active = false;
     };
-  }, [user]);
+  }, [id, currentUser, isOwnProfile]);
 
-  if (!user) {
+  if (!currentUser) {
     return (
       <EmptyState
         eyebrow="Profile"
@@ -60,95 +73,123 @@ export default function Profile() {
     );
   }
 
-  const bio = user.prefs?.bio || "Sharing everyday moments, music drops, and snapshots from the timeline.";
-  const followers = user.prefs?.followersCount || 0;
-  const following = user.prefs?.followingCount || 0;
+  const profileName = isOwnProfile
+    ? currentUser.name
+    : posts[0]?.authorName || "User";
+
+  const bio =
+    isOwnProfile
+      ? currentUser.prefs?.bio
+      : "Exploring and sharing moments."
+      || "Sharing everyday moments, music drops, and snapshots.";
+
+  const followers = currentUser.prefs?.followersCount || 0;
+  const following = currentUser.prefs?.followingCount || 0;
 
   return (
     <div className="space-y-5">
+      {/* PROFILE HEADER */}
       <section className="rounded-[32px] border border-white/10 bg-[#121212]/92 p-5 shadow-[0_30px_90px_rgba(0,0,0,0.34)]">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-          <Avatar name={user.name} size="xl" ring />
+          <Avatar name={profileName} size="xl" ring />
+
           <div className="flex-1">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="font-display text-3xl text-white">{getHandle(user.name)}</p>
-                <p className="mt-1 text-sm text-zinc-500">{user.email}</p>
+                <p className="font-display text-3xl text-white">
+                  {getHandle(profileName)}
+                </p>
+
+                {isOwnProfile && (
+                  <p className="mt-1 text-sm text-zinc-500">
+                    {currentUser.email}
+                  </p>
+                )}
               </div>
-              <div className="flex gap-2">
-                <Link
-                  to="/create"
-                  className="rounded-full bg-zinc-100 px-4 py-2 text-sm font-semibold !text-zinc-950 transition hover:bg-zinc-200 hover:!text-zinc-950"
-                >
-                  New post
-                </Link>
-                <Link
-                  to="/favorites"
-                  className="rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-white/20 hover:text-white"
-                >
-                  Saved
-                </Link>
-              </div>
+
+              {/* ACTION BUTTONS */}
+              {isOwnProfile && (
+                <div className="flex gap-2">
+                  <Link
+                    to="/create"
+                    className="rounded-full bg-zinc-100 px-4 py-2 text-sm font-semibold !text-zinc-950 transition hover:bg-zinc-200"
+                  >
+                    New post
+                  </Link>
+                  <Link
+                    to="/favorites"
+                    className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 transition hover:border-white/20 hover:text-white"
+                  >
+                    Saved
+                  </Link>
+                </div>
+              )}
             </div>
 
-            <p className="mt-4 max-w-xl text-sm leading-6 text-zinc-400">{bio}</p>
+            <p className="mt-4 max-w-xl text-sm text-zinc-400">
+              {bio}
+            </p>
 
-           <div className="mt-5 flex items-center rounded-[24px] border border-white/10 bg-black/35 py-4">
-  
-  <div className="flex-1 text-center">
-    <p className="font-display text-lg text-white">
-      {formatCompactNumber(posts.length)}
-    </p>
-    <p className="mt-1 text-[10px] uppercase tracking-[0.1em] text-zinc-500">
-      Posts
-    </p>
-  </div>
+            {/* STATS */}
+            <div className="mt-5 flex items-center rounded-[24px] border border-white/10 bg-black/35 py-4">
+              <div className="flex-1 text-center">
+                <p className="font-display text-lg text-white">
+                  {formatCompactNumber(posts.length)}
+                </p>
+                <p className="text-[10px] text-zinc-500 uppercase">
+                  Posts
+                </p>
+              </div>
 
-  <div className="w-px self-stretch bg-white/10"></div>
+              <div className="w-px bg-white/10"></div>
 
-  <div className="flex-1 text-center">
-    <p className="font-display text-lg text-white">
-      {formatCompactNumber(followers)}
-    </p>
-    <p className="mt-1 text-[10px] uppercase tracking-[0.1em] text-zinc-500">
-      Followers
-    </p>
-  </div>
+              <div className="flex-1 text-center">
+                <p className="font-display text-lg text-white">
+                  {formatCompactNumber(followers)}
+                </p>
+                <p className="text-[10px] text-zinc-500 uppercase">
+                  Followers
+                </p>
+              </div>
 
-  <div className="w-px self-stretch bg-white/10"></div>
+              <div className="w-px bg-white/10"></div>
 
-  <div className="flex-1 text-center">
-    <p className="font-display text-lg text-white">
-      {formatCompactNumber(following)}
-    </p>
-    <p className="mt-1 text-[10px] uppercase tracking-[0.1em] text-zinc-500">
-      Following
-    </p>
-  </div>
+              <div className="flex-1 text-center">
+                <p className="font-display text-lg text-white">
+                  {formatCompactNumber(following)}
+                </p>
+                <p className="text-[10px] text-zinc-500 uppercase">
+                  Following
+                </p>
+              </div>
 
-  <div className="w-px self-stretch bg-white/10"></div>
-
-  <div className="flex-1 text-center">
-    <p className="font-display text-lg text-white">
-      {formatCompactNumber(savedCount)}
-    </p>
-    <p className="mt-1 text-[10px] uppercase tracking-[0.1em] text-zinc-500">
-      Saved
-    </p>
-  </div>
-
-</div>
+              {isOwnProfile && (
+                <>
+                  <div className="w-px bg-white/10"></div>
+                  <div className="flex-1 text-center">
+                    <p className="font-display text-lg text-white">
+                      {formatCompactNumber(savedCount)}
+                    </p>
+                    <p className="text-[10px] text-zinc-500 uppercase">
+                      Saved
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </section>
 
+      {/* POSTS GRID */}
       <section className="rounded-[32px] border border-white/10 bg-[#121212]/92 p-5 shadow-[0_30px_90px_rgba(0,0,0,0.34)]">
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.32em] text-zinc-500">Posts</p>
-            <h2 className="font-display text-2xl text-white">Your grid</h2>
-          </div>
-          <p className="text-sm text-zinc-500">{posts.length} uploads</p>
+        <div className="mb-4 flex justify-between">
+          <h2 className="text-2xl text-white">
+            {isOwnProfile ? "Your grid" : `${profileName}'s posts`}
+          </h2>
+          <p className="text-sm text-zinc-500">
+            {posts.length} uploads
+          </p>
         </div>
 
         {loading ? (
@@ -160,35 +201,49 @@ export default function Profile() {
 
               return (
                 <Link
-  key={post.$id}
-  to={`/post/${post.slug}`}
-  className="group overflow-hidden rounded-[24px] border border-white/10 bg-black/35"
->
-  <div className="aspect-square overflow-hidden">
-    {imageSrc ? (
-      <img
-        src={imageSrc}
-        alt={post.title}
-        loading="lazy"
-        className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
-      />
-    ) : (
-      <div className="flex h-full items-end bg-[radial-gradient(circle_at_top,_rgba(255,115,0,0.28),_transparent_45%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] p-3">
-        <p className="font-display text-lg text-white">{post.title}</p>
-      </div>
-    )}
-  </div>
-</Link>
+                  key={post.$id}
+                  to={`/post/${post.slug}`}
+                  className="group rounded-[24px] overflow-hidden border border-white/10"
+                >
+                  <div className="aspect-square relative overflow-hidden">
+                    {imageSrc ? (
+                      <>
+                        <img
+                          src={imageSrc}
+                          alt={post.title}
+                          className="w-full h-full object-cover transition duration-500 group-hover:scale-105"
+                        />
+
+                        {/* 🔥 Overlay */}
+                        <div className="absolute inset-0 flex items-end p-3
+        bg-[linear-gradient(to_top,rgba(0,0,0,0.75),rgba(0,0,0,0.15),transparent)]
+      ">
+                          <p className="text-white text-sm font-semibold line-clamp-2">
+                            {post.title}
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex h-full items-end p-3
+      bg-[radial-gradient(circle_at_top,_rgba(255,115,0,0.25),_transparent_50%),linear-gradient(to_top,rgba(0,0,0,0.7),rgba(0,0,0,0.1))]
+      backdrop-blur-md
+    ">
+                        <p className="text-white text-sm font-semibold">
+                          {post.title}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  
+                </Link>
               );
             })}
           </div>
         ) : (
           <EmptyState
             eyebrow="Profile"
-            title="Your grid is still empty"
-            description="Create your first post and it will land here in a clean gallery layout."
-            actionLabel="Create a post"
-            actionTo="/create"
+            title="No posts yet"
+            description="Nothing to show here."
           />
         )}
       </section>

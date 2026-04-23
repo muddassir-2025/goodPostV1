@@ -40,6 +40,8 @@ export default function PostCard({
 
   const openPost = () => navigate(`/post/${post.slug}`);
 
+  const openProfile = () => navigate(`/profile/${post.authorID}`);
+
   async function handleShare() {
     const shareUrl = `${window.location.origin}/post/${post.slug}`;
 
@@ -55,15 +57,20 @@ export default function PostCard({
   return (
     <article className="group overflow-hidden rounded-[30px] border border-white/10 bg-[#121212]/92 p-4 shadow-[0_30px_90px_rgba(0,0,0,0.34)] transition duration-300 hover:-translate-y-0.5 hover:border-white/20">
       <div className="mb-4 flex items-start justify-between gap-3">
+
         <button
           type="button"
-          onClick={openPost}
-          className="flex items-center gap-3 text-left"
+          onClick={openProfile}
+          className="flex items-center gap-3 text-left cursor-pointer"
         >
           <Avatar name={post.authorName} size="md" ring />
           <div>
-            <p className="font-semibold text-white">{getHandle(post.authorName)}</p>
-            <p className="text-xs text-zinc-500">{formatRelativeTime(post.$createdAt)}</p>
+            <p className="font-semibold text-white">
+              {getHandle(post.authorName)}
+            </p>
+            <p className="text-xs text-zinc-500">
+              {formatRelativeTime(post.$createdAt)}
+            </p>
           </div>
         </button>
 
@@ -108,8 +115,8 @@ export default function PostCard({
                     type="button"
                     onClick={async () => {
                       setMenuOpen(false);
-                       const ok = await confirm("Delete this post?");
-                       if (!ok) return;
+                      const ok = await confirm("Delete this post?");
+                      if (!ok) return;
                       onDelete(post);
                     }}
                     className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-rose-300 transition hover:bg-rose-500/10"
@@ -128,7 +135,7 @@ export default function PostCard({
         <button
           type="button"
           onClick={openPost}
-          className="block w-full overflow-hidden rounded-[26px] bg-black/50"
+          className="block w-full overflow-hidden rounded-[26px] bg-black/50 cursor-pointer"
         >
           {imageSrc ? (
             <img
