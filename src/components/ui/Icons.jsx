@@ -231,3 +231,20 @@ export function ShieldIcon({ className = "" }) {
     </svg>
   );
 }
+
+export function TrendingIcon({ className = "" }) {
+  return (
+    <svg {...svgProps(className)}>
+      <path d="M22 7l-8.5 8.5L9 11l-7 7" />
+      <path d="M16 7h6v6" />
+    </svg>
+  );
+}
+
+export function PlayIcon({ className = "" }) {
+  return (
+    <svg {...svgProps(className)} fill="currentColor" stroke="none">
+      <path d="M5 3.5l14 8.5-14 8.5v-17z" />
+    </svg>
+  );
+}

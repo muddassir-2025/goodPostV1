@@ -234,9 +234,16 @@ export default function PostCard({
         {post.tags?.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2">
             {post.tags.map((tag) => (
-              <span key={tag} className="rounded-full border border-white/10 bg-white/5 px-2 py-[2px] text-[10px] uppercase tracking-wider text-zinc-400">
-                {tag}
-              </span>
+              <button
+                key={tag}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/search?q=${tag}&type=tag`);
+                }}
+                className="rounded-full border border-white/10 bg-white/5 px-2 py-[2px] text-[10px] uppercase tracking-wider text-zinc-400 transition hover:bg-white/10 hover:text-white"
+              >
+                #{tag}
+              </button>
             ))}
           </div>
         )}
