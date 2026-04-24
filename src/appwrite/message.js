@@ -1,4 +1,4 @@
-import { Client, Databases, ID, Query, Permission, Role } from "appwrite";
+import { Client, Databases, ID, Query } from "appwrite";
 
 class MessageService {
   client = new Client();
@@ -16,96 +16,175 @@ class MessageService {
     return import.meta.env.VITE_APPWRITE_DATABASE_ID;
   }
 
-  get messagesCollectionId() {
+  get conversationsId() {
+    return import.meta.env.VITE_APPWRITE_CONVERSATIONS_ID || "conversations";
+  }
+
+  get messagesId() {
     return import.meta.env.VITE_APPWRITE_MESSAGES_ID || "messages";
   }
 
-  // ✅ Send Message
-  async sendMessage({ senderId, receiverId, content, senderName }) {
+  // ✅ Get all conversations for a user
+  async getConversations(userId) {
     try {
-      return await this.databases.createDocument(
+      return await this.databases.listDocuments(
         this.databaseId,
-        this.messagesCollectionId,
-        ID.unique(),
-        {
-          senderId,
-          receiverId,
-          content,
-          senderName,
-          status: "sent",
-        },
+        this.conversationsId,
         [
-          Permission.read(Role.user(senderId)),
-          Permission.read(Role.user(receiverId)),
-          Permission.write(Role.user(senderId)),
+          Query.search("members", userId), // Since Appwrite arrays don't have .contains, we often use search or multiple equals if we know the positions, but Appwrite 1.3+ supports contains. Assuming Appwrite supports `Query.contains` or `Query.search`. Let's use `Query.contains("members", userId)` if possible, else we might need a different approach. Actually Appwrite supports `Query.contains("members", [userId])` or similar. Let's use `Query.contains("members", [userId])`.
+          Query.orderDesc("lastMessageAt"),
+          Query.limit(50),
         ]
       );
     } catch (error) {
-      console.error("Send message error:", error);
+      console.log("getConversations error:", error);
+      return { documents: [] };
+    }
+  }
+
+  // ✅ Get specific conversation
+  async getConversation(conversationId) {
+    try {
+      return await this.databases.getDocument(
+        this.databaseId,
+        this.conversationsId,
+        conversationId
+      );
+    } catch (error) {
+      console.log("getConversation error:", error);
+      return null;
+    }
+  }
+
+  // ✅ Find conversation by members
+  async getConversationByMembers(userId1, userId2) {
+    try {
+      // Appwrite queries on arrays can be tricky, but if we query contains for both, it works.
+      const res = await this.databases.listDocuments(
+        this.databaseId,
+        this.conversationsId,
+        [
+          Query.contains("members", [userId1]),
+          Query.contains("members", [userId2]),
+          Query.limit(1)
+        ]
+      );
+      return res.documents[0] || null;
+    } catch (error) {
+      console.log("getConversationByMembers error:", error);
+      return null;
+    }
+  }
+
+  // ✅ Create conversation
+  async createConversation(members) {
+    try {
+      return await this.databases.createDocument(
+        this.databaseId,
+        this.conversationsId,
+        ID.unique(),
+        {
+          members,
+          lastMessage: "",
+          lastMessageAt: new Date().toISOString(),
+          unreadCount: 0,
+        }
+      );
+    } catch (error) {
+      console.log("createConversation error:", error);
       throw error;
     }
   }
 
-  // ✅ Get Messages between two users
-  async getMessages(myId, otherId) {
+  // ✅ Get messages for a conversation
+  async getMessages(conversationId) {
     try {
-      const res = await this.databases.listDocuments(
+      return await this.databases.listDocuments(
         this.databaseId,
-        this.messagesCollectionId,
+        this.messagesId,
         [
-          Query.or([
-            Query.and([Query.equal("senderId", myId), Query.equal("receiverId", otherId)]),
-            Query.and([Query.equal("senderId", otherId), Query.equal("receiverId", myId)]),
-          ]),
-          Query.orderAsc("$createdAt"),
+          Query.equal("conversationId", conversationId),
+          Query.orderAsc("createdAt"), // Order by oldest first for chat history
           Query.limit(100),
         ]
       );
-      return res.documents;
     } catch (error) {
-      console.error("Get messages error:", error);
-      return [];
+      console.log("getMessages error:", error);
+      return { documents: [] };
     }
   }
 
-  // ✅ Get Conversations (Recent chats)
-  async getConversations(myId) {
+  // ✅ Send a message
+  async sendMessage(conversationId, senderId, text) {
     try {
-      const res = await this.databases.listDocuments(
+      const now = new Date().toISOString();
+      const message = await this.databases.createDocument(
         this.databaseId,
-        this.messagesCollectionId,
-        [
-          Query.or([
-            Query.equal("senderId", myId),
-            Query.equal("receiverId", myId),
-          ]),
-          Query.orderDesc("$createdAt"),
-          Query.limit(100),
-        ]
-      );
-
-      // Group by other user and pick the latest message
-      const threads = {};
-      res.documents.forEach((msg) => {
-        const otherId = msg.senderId === myId ? msg.receiverId : msg.senderId;
-        if (!threads[otherId]) {
-          threads[otherId] = msg;
+        this.messagesId,
+        ID.unique(),
+        {
+          conversationId,
+          senderId,
+          text,
+          createdAt: now,
+          seen: false,
         }
-      });
+      );
 
-      return Object.values(threads);
+      // Update conversation's last message info
+      const conversation = await this.getConversation(conversationId);
+      if (conversation) {
+        await this.databases.updateDocument(
+          this.databaseId,
+          this.conversationsId,
+          conversationId,
+          {
+            lastMessage: text,
+            lastMessageAt: now,
+            unreadCount: (conversation.unreadCount || 0) + 1,
+          }
+        );
+      }
+
+      return message;
     } catch (error) {
-      console.error("Get conversations error:", error);
-      return [];
+      console.log("sendMessage error:", error);
+      throw error;
     }
   }
 
-  // ✅ Real-time Subscription
-  subscribe(callback) {
-    const channel = `databases.${this.databaseId}.collections.${this.messagesCollectionId}.documents`;
-    return this.client.subscribe(channel, (response) => {
-      callback(response);
-    });
+  // ✅ Mark messages as seen
+  async markSeen(conversationId) {
+    try {
+      await this.databases.updateDocument(
+        this.databaseId,
+        this.conversationsId,
+        conversationId,
+        {
+          unreadCount: 0,
+        }
+      );
+    } catch (error) {
+      console.log("markSeen error:", error);
+    }
+  }
+
+  // ✅ Real-time subscription
+  subscribeToMessages(conversationId, callback) {
+    return this.client.subscribe(
+      `databases.${this.databaseId}.collections.${this.messagesId}.documents`,
+      (response) => {
+        // Appwrite realtime event payload
+        if (
+          response.events.includes(`databases.${this.databaseId}.collections.${this.messagesId}.documents.*.create`) ||
+          response.events.includes(`databases.${this.databaseId}.collections.${this.messagesId}.documents.*.update`)
+        ) {
+           if (response.payload.conversationId === conversationId) {
+             callback(response.payload);
+           }
+        }
+      }
+    );
   }
 }
 

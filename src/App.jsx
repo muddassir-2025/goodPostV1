@@ -22,6 +22,7 @@ import ConfirmPopup from "./components/ConfirmPopup";
 import Toast from "./components/Toast";
 
 import Notifications from "./pages/Notifications";
+import Chat from "./pages/Chat";
 
 function App() {
   const dispatch = useDispatch();
@@ -72,6 +73,7 @@ function App() {
           <Route index element={<Home />} />
           <Route path="/search" element={<Search />} />
           <Route path="/messages" element={<Messages />} />
+          <Route path="/messages/:conversationId" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="/post/:slug" element={<SinglePost />} />
           <Route 
             path="/notifications" 
