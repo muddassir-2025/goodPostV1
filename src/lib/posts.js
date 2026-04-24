@@ -41,14 +41,14 @@ export function rankPostsForYou(posts = []) {
       // 1. Freshness Score (100 points max, decays over 7 days)
       const freshness = Math.max(0, 100 - ageInDays * 15);
 
-      // 2. Engagement Score (5 points per like)
-      const engagement = (post.likeCount || 0) * 5;
+      // 2. Engagement Score (Likes + Comments weight)
+      const engagement = (post.likeCount || 0) * 5 + (post.commentCount || 0) * 8;
 
-      // 3. Audio Bonus (20 points for having audio)
-      const audioBonus = post.audioId ? 20 : 0;
+      // 3. Audio Bonus (15 points for having audio)
+      const audioBonus = post.audioId ? 15 : 0;
 
-      // 4. Random Factor (0-60 points) - This causes the shuffle on reload
-      const randomness = Math.random() * 60;
+      // 4. Random Factor (0-40 points) - Reduces echo chambers
+      const randomness = Math.random() * 40;
 
       const score = freshness + engagement + audioBonus + randomness;
 

@@ -16,6 +16,7 @@ import { buildStories } from "../lib/ui";
 const filters = [
   { id: "discovery", label: "For You" },
   { id: "following", label: "Following" },
+  { id: "latest", label: "Latest" },
   { id: "likes", label: "Popular" },
 ];
 
