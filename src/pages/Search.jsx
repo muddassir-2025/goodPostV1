@@ -44,9 +44,17 @@ export default function Search() {
   const [query, setQuery] = useState(initialQuery);
   const [activeCategory, setActiveCategory] = useState("for-you");
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isFullList, setIsFullList] = useState(false); // New state for "See all" flow
   
   const debouncedQuery = useDebounce(query, 300);
   const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (initialQuery) {
+      setQuery(initialQuery);
+      setIsFullList(true);
+    }
+  }, [initialQuery]);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -74,7 +82,7 @@ export default function Search() {
     return () => { active = false; };
   }, [user]);
 
-  // 📈 TRENDING TOPICS (X STYLE)
+  // 📈 TRENDING DATA
   const trendingData = useMemo(() => {
     const topicMap = {};
     posts.forEach(p => {
@@ -92,31 +100,14 @@ export default function Search() {
       });
     });
 
-    return Object.values(topicMap)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+    return Object.values(topicMap).sort((a, b) => b.count - a.count);
   }, [posts]);
-
-  // 🔍 SUGGESTIONS LOGIC
-  const suggestions = useMemo(() => {
-    if (!debouncedQuery || debouncedQuery.length < 2) return null;
-    const lower = debouncedQuery.toLowerCase();
-    
-    return {
-      tags: trendingData.filter(t => t.name.toLowerCase().includes(lower)).slice(0, 3),
-      posts: posts.filter(p => p.title?.toLowerCase().includes(lower)).slice(0, 3),
-      users: Array.from(new Set(posts.map(p => p.authorName)))
-        .filter(u => u.toLowerCase().includes(lower))
-        .slice(0, 3)
-    };
-  }, [debouncedQuery, posts, trendingData]);
 
   // 🎯 RESULT FILTERING
   const results = useMemo(() => {
     let filtered = posts;
     const lowerQuery = debouncedQuery.toLowerCase();
 
-    // 1. If searching, return matched posts
     if (debouncedQuery) {
       filtered = posts.filter(p => {
         const text = `${p.title} ${p.content} ${p.authorName} ${p.tags?.join(" ")}`.toLowerCase();
@@ -125,35 +116,41 @@ export default function Search() {
       return rankPostsForYou(filtered);
     }
 
-    // 2. Tab filtering logic
     if (activeCategory === "for-you") return rankPostsForYou(posts);
-    if (activeCategory === "trending") return []; // Trending shows topic list, not posts
+    if (activeCategory === "trending") return [];
     
-    // Exact tag match for category tabs
-    const tabFiltered = posts.filter(p => 
+    // Category filtering
+    return posts.filter(p => 
       p.tags?.some(t => t.toLowerCase() === activeCategory.toLowerCase())
     );
-    
-    return rankPostsForYou(tabFiltered);
   }, [posts, debouncedQuery, activeCategory]);
+
+  const categoryTrendingTopics = useMemo(() => {
+    if (activeCategory === "for-you" || activeCategory === "trending") return trendingData.slice(0, 10);
+    
+    // Filter trending topics that belong to this category
+    return trendingData.filter(t => t.name.toLowerCase() === activeCategory.toLowerCase());
+  }, [trendingData, activeCategory]);
 
   const handleSearchSelect = (val, type = "query") => {
     setQuery(val);
     setShowDropdown(false);
-    if (type === "tag") {
-       navigate(`/search?q=${val}&type=tag`);
-    }
+    setIsFullList(true);
   };
 
-  const isDiscoveryMode = !debouncedQuery && (activeCategory === "for-you" || activeCategory === "trending");
+  const handleTabChange = (id) => {
+    setActiveCategory(id);
+    setQuery("");
+    setIsFullList(false);
+  };
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* 🔍 TOP NAV (Twitter Style) */}
+      {/* 🔍 TOP NAV */}
       <header className="sticky top-16 z-40 bg-black/80 backdrop-blur-md md:top-20">
         <div className="flex items-center gap-4 px-4 py-3">
           <div className="relative flex-1" ref={dropdownRef}>
-            <div className="flex items-center gap-3 rounded-full bg-[#202327] px-4 py-2 transition-focus-within:bg-black transition-focus-within:ring-1 transition-focus-within:ring-blue-500">
+            <div className="flex items-center gap-3 rounded-full bg-[#202327] px-4 py-2">
               <SearchIcon className="h-4 w-4 text-zinc-500" />
               <input
                 type="text"
@@ -162,47 +159,24 @@ export default function Search() {
                 onChange={(e) => {
                   setQuery(e.target.value);
                   setShowDropdown(true);
+                  if (e.target.value) setIsFullList(true);
                 }}
                 placeholder="Search"
-                className="w-full bg-transparent text-[15px] text-white outline-none placeholder:text-zinc-500"
+                className="w-full bg-transparent text-[15px] text-white outline-none"
               />
             </div>
-
-            {/* DROP-DOWN SUGGESTIONS */}
-            {showDropdown && suggestions && (
-              <div className="absolute top-full mt-1 w-full overflow-hidden rounded-2xl bg-black shadow-[0_0_15px_rgba(255,255,255,0.1)] ring-1 ring-white/10">
-                {suggestions.tags.map(t => (
-                  <button key={t.name} onClick={() => handleSearchSelect(t.name, "tag")} className="flex w-full items-center gap-3 p-4 hover:bg-white/5">
-                    <SearchIcon className="h-4 w-4 text-zinc-500" />
-                    <span className="font-bold">#{t.name}</span>
-                  </button>
-                ))}
-                {suggestions.users.map(u => (
-                  <button key={u} onClick={() => handleSearchSelect(u)} className="flex w-full items-center gap-3 p-4 hover:bg-white/5">
-                    <Avatar name={u} size="xs" />
-                    <div className="text-left">
-                      <p className="text-sm font-bold">{u}</p>
-                      <p className="text-xs text-zinc-500">{getHandle(u)}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
           <button className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/10">
             <DotsIcon className="h-5 w-5" />
           </button>
         </div>
 
-        {/* 📑 HORIZONTAL SCROLL TABS */}
+        {/* 📑 TABS */}
         <div className="hide-scrollbar flex overflow-x-auto border-b border-white/10">
           {CATEGORIES.map((cat) => (
             <button
               key={cat.id}
-              onClick={() => {
-                setActiveCategory(cat.id);
-                setQuery("");
-              }}
+              onClick={() => handleTabChange(cat.id)}
               className={`relative min-w-[100px] py-4 text-sm font-medium transition whitespace-nowrap px-4 ${
                 activeCategory === cat.id && !query ? "text-white" : "text-zinc-500 hover:text-zinc-300"
               }`}
@@ -219,81 +193,106 @@ export default function Search() {
       <div className="divide-y divide-white/10">
         {loading ? (
           <div className="p-10 text-center"><PostSkeleton count={5} /></div>
-        ) : isDiscoveryMode && activeCategory === "trending" ? (
-          /* TRENDING TOPICS LIST (ONLY for Trending tab) */
-          trendingData.map((topic) => (
-            <button
-              key={topic.name}
-              onClick={() => handleSearchSelect(topic.name, "tag")}
-              className="flex w-full items-start justify-between p-4 text-left transition hover:bg-white/[0.03]"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1 text-[13px] text-zinc-500">
-                  <span>Trending</span>
-                  <span>·</span>
-                  <span>#{topic.name}</span>
-                </div>
-                <h2 className="mt-1 text-[15px] font-extrabold text-white">#{topic.name}</h2>
-                <div className="mt-2 flex items-center gap-2">
-                  <div className="flex -space-x-2">
-                    {Array.from(topic.authors).slice(0, 3).map((auth, i) => (
-                      <div key={i} className="ring-2 ring-black rounded-full">
-                        <Avatar name={auth} size="xs" />
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-[13px] text-zinc-500">
-                    {topic.count > 1000 ? `${(topic.count / 1000).toFixed(1)}K` : topic.count} posts
-                  </p>
-                </div>
-              </div>
-              <button className="text-zinc-600">
-                <DotsIcon className="h-5 w-5" />
-              </button>
-            </button>
-          ))
-        ) : results.length > 0 ? (
-          /* POST LIST (For all tags and For You) */
-          results.map((post) => (
-            <button
-              key={post.$id}
-              onClick={() => navigate(`/post/${post.slug}`)}
-              className="flex w-full items-start gap-4 p-4 text-left transition hover:bg-white/[0.03]"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1 text-[13px] text-zinc-500">
-                  <span className="font-bold text-white">{post.authorName}</span>
-                  <span>{getHandle(post.authorName)}</span>
-                  <span>·</span>
-                  <span>{formatRelativeTime(post.$createdAt)}</span>
-                </div>
-                <p className="mt-1 text-[15px] font-bold text-white leading-snug">{post.title}</p>
-                <p className="mt-1 line-clamp-2 text-[15px] text-zinc-400 leading-normal">{post.content}</p>
-                <div className="mt-3 flex items-center gap-5 text-zinc-500">
-                  <span className="flex items-center gap-1.5 text-xs"><CommentIcon className="h-4 w-4" /> {post.commentCount}</span>
-                  <span className="flex items-center gap-1.5 text-xs text-rose-500/80"><HeartIcon className="h-4 w-4" /> {post.likeCount}</span>
-                </div>
-              </div>
-              {post.featuredImg && (
-                <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl border border-white/10">
-                  <img src={getFileUrl(post.featuredImg)} className="h-full w-full object-cover" />
-                </div>
-              )}
-            </button>
-          ))
         ) : (
-          /* EMPTY STATE */
-          <div className="p-10 text-center animate-in fade-in duration-700">
-            <EmptyState 
-              title={debouncedQuery ? "No search results" : `No posts in ${activeCategory}`}
-              description={debouncedQuery ? "Try different keywords" : "Browse other categories or share your own!"}
-              actionLabel="Browse For You"
-              onClickAction={() => {
-                setQuery("");
-                setActiveCategory("for-you");
-              }}
-            />
-          </div>
+          <>
+            {/* 1. TOP HIGHLIGHTS / TRENDING (Only if not in full list mode) */}
+            {!isFullList && !debouncedQuery && activeCategory !== "for-you" && (
+              <div className="divide-y divide-white/10">
+                {categoryTrendingTopics.length > 0 ? categoryTrendingTopics.map((topic) => (
+                  <button
+                    key={topic.name}
+                    onClick={() => setIsFullList(true)}
+                    className="flex w-full flex-col p-4 text-left transition hover:bg-white/[0.03]"
+                  >
+                    <div className="flex items-center gap-1 text-[13px] text-zinc-500">
+                      <span>Trending in {activeCategory}</span>
+                      <span>·</span>
+                      <span>Trending</span>
+                    </div>
+                    <h2 className="mt-1 text-[15px] font-extrabold text-white">#{topic.name}</h2>
+                    <div className="mt-2 flex items-center gap-2">
+                       <div className="flex -space-x-2">
+                        {Array.from(topic.authors).slice(0, 3).map((auth, i) => (
+                          <div key={i} className="ring-2 ring-black rounded-full">
+                            <Avatar name={auth} size="xs" />
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[13px] text-zinc-500">{topic.count} posts</p>
+                    </div>
+                    <p className="mt-3 text-[14px] text-blue-400 font-medium">Click to see all {activeCategory} posts</p>
+                  </button>
+                )) : (
+                   /* EMPTY STATE for Categories with no posts */
+                   activeCategory !== "trending" && (
+                    <div className="p-10 text-center">
+                      <EmptyState 
+                        title={`No posts in ${activeCategory}`} 
+                        description="Be the first to share something!"
+                        actionLabel="Go to For You"
+                        onClickAction={() => handleTabChange("for-you")}
+                      />
+                    </div>
+                   )
+                )}
+
+                {/* Specific Trending Tab View */}
+                {activeCategory === "trending" && trendingData.map(topic => (
+                   <button
+                    key={topic.name}
+                    onClick={() => {
+                      setActiveCategory(topic.name);
+                      setIsFullList(true);
+                    }}
+                    className="flex w-full items-start justify-between p-4 text-left transition hover:bg-white/[0.03]"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] text-zinc-500">Trending</p>
+                      <h2 className="mt-1 text-[15px] font-extrabold text-white">#{topic.name}</h2>
+                      <p className="text-[13px] text-zinc-500 mt-1">{topic.count} posts</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* 2. FULL POST LIST (Shows for "For You", or when "See all" is clicked, or when searching) */}
+            {(isFullList || debouncedQuery || activeCategory === "for-you") && (
+              <div className="divide-y divide-white/10 animate-in fade-in duration-500">
+                {results.length > 0 ? results.map((post) => (
+                  <button
+                    key={post.$id}
+                    onClick={() => navigate(`/post/${post.slug}`)}
+                    className="flex w-full items-start gap-4 p-4 text-left transition hover:bg-white/[0.03]"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1 text-[13px] text-zinc-500">
+                        <span className="font-bold text-white">{post.authorName}</span>
+                        <span>{getHandle(post.authorName)}</span>
+                        <span>·</span>
+                        <span>{formatRelativeTime(post.$createdAt)}</span>
+                      </div>
+                      <p className="mt-1 text-[15px] font-bold text-white leading-snug">{post.title}</p>
+                      <p className="mt-1 line-clamp-2 text-[15px] text-zinc-400 leading-normal">{post.content}</p>
+                      <div className="mt-3 flex items-center gap-5 text-zinc-500">
+                        <span className="flex items-center gap-1.5 text-xs"><CommentIcon className="h-4 w-4" /> {post.commentCount}</span>
+                        <span className="flex items-center gap-1.5 text-xs text-rose-500/80"><HeartIcon className="h-4 w-4" /> {post.likeCount}</span>
+                      </div>
+                    </div>
+                    {post.featuredImg && (
+                      <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl border border-white/10">
+                        <img src={getFileUrl(post.featuredImg)} className="h-full w-full object-cover" />
+                      </div>
+                    )}
+                  </button>
+                )) : (
+                  <div className="p-10 text-center">
+                    <EmptyState title="No posts found" description="Try another category" />
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
