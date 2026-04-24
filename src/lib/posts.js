@@ -29,8 +29,40 @@ export function filterPosts(posts = [], query = "") {
   );
 }
 
+export function rankPostsForYou(posts = []) {
+  const now = Date.now();
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+  return [...posts]
+    .map((post) => {
+      const ageMs = now - new Date(post.$createdAt).getTime();
+      const ageInDays = ageMs / ONE_DAY_MS;
+
+      // 1. Freshness Score (100 points max, decays over 7 days)
+      const freshness = Math.max(0, 100 - ageInDays * 15);
+
+      // 2. Engagement Score (5 points per like)
+      const engagement = (post.likeCount || 0) * 5;
+
+      // 3. Audio Bonus (20 points for having audio)
+      const audioBonus = post.audioId ? 20 : 0;
+
+      // 4. Random Factor (0-60 points) - This causes the shuffle on reload
+      const randomness = Math.random() * 60;
+
+      const score = freshness + engagement + audioBonus + randomness;
+
+      return { ...post, _algoScore: score };
+    })
+    .sort((a, b) => b._algoScore - a._algoScore);
+}
+
 export function sortPosts(posts = [], filter = "latest") {
   const sorted = [...posts];
+
+  if (filter === "discovery") {
+    return rankPostsForYou(sorted);
+  }
 
   if (filter === "likes") {
     return sorted.sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0));

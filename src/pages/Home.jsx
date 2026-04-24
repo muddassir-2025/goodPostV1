@@ -14,7 +14,7 @@ import { fetchFeedPosts, filterPosts, sortPosts } from "../lib/posts";
 import { buildStories } from "../lib/ui";
 
 const filters = [
-  { id: "latest", label: "For You" },
+  { id: "discovery", label: "For You" },
   { id: "following", label: "Following" },
   { id: "likes", label: "Popular" },
 ];
@@ -29,7 +29,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("latest");
+  const [filter, setFilter] = useState("discovery");
 
   // ✅ INFINITE SCROLL STATE
   const [visibleCount, setVisibleCount] = useState(5);
