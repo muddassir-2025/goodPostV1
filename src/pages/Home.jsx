@@ -293,10 +293,10 @@ export default function Home() {
             <button
               key={item.id}
               onClick={() => setFilter(item.id)}
-              className={`rounded-full px-4 py-2 text-sm transition ${
+              className={`rounded-full px-4 py-2 text-sm transition whitespace-nowrap border ${
                 filter === item.id
-                  ? "bg-white text-black"
-                  : "border border-white/10 bg-white/5 text-zinc-400 hover:text-white"
+                  ? "border-transparent bg-white text-black font-medium"
+                  : "border-white/10 bg-white/5 text-zinc-400 hover:text-white"
               }`}
             >
               {item.label}
