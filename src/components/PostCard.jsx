@@ -11,7 +11,6 @@ import {
   CommentIcon,
   DotsIcon,
   EditIcon,
-  ImageIcon,
   PlayIcon,
   ShareIcon,
   ShieldIcon,
