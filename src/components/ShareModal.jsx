@@ -5,7 +5,8 @@ import {
   CheckIcon,
   TwitterIcon,
   WhatsappIcon,
-  FacebookIcon
+  FacebookIcon,
+  ShareIcon
 } from "./ui/Icons";
 import { getFileUrl } from "../lib/ui";
 
@@ -14,22 +15,39 @@ export default function ShareModal({ post, onClose }) {
   const shareUrl = window.location.href;
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(shareUrl);
+    const textToCopy = `${post.title}\n\n${post.content}\n\nRead more at: ${shareUrl}`;
+    navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: post.title,
+          text: post.content,
+          url: shareUrl,
+        });
+      } catch (err) {
+        console.log("Error sharing:", err);
+      }
+    }
+  };
+
+  const shareText = encodeURIComponent(`Check out this post by ${post.authorName} on Moments:\n\n*${post.title}*\n${post.content.slice(0, 50)}...\n\n${shareUrl}`);
 
   const socialLinks = [
     {
       name: "Twitter",
       icon: TwitterIcon,
-      url: `https://twitter.com/intent/tweet?text=${encodeURIComponent(post.title)}&url=${encodeURIComponent(shareUrl)}`,
+      url: `https://twitter.com/intent/tweet?text=${shareText}`,
       color: "hover:bg-sky-500/10 hover:text-sky-400"
     },
     {
       name: "WhatsApp",
       icon: WhatsappIcon,
-      url: `https://wa.me/?text=${encodeURIComponent(post.title + " " + shareUrl)}`,
+      url: `https://wa.me/?text=${shareText}`,
       color: "hover:bg-emerald-500/10 hover:text-emerald-400"
     },
     {
@@ -101,6 +119,17 @@ export default function ShareModal({ post, onClose }) {
               </a>
             ))}
           </div>
+
+          {/* NATIVE SHARE (MOBILE ONLY) */}
+          {navigator.share && (
+            <button
+              onClick={handleNativeShare}
+              className="mb-6 flex w-full items-center justify-center gap-3 rounded-2xl bg-white px-4 py-4 text-sm font-bold text-black transition hover:bg-zinc-200"
+            >
+              <ShareIcon className="h-5 w-5" />
+              Open System Share
+            </button>
+          )}
 
           {/* COPY LINK */}
           <div className="space-y-2">
