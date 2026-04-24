@@ -47,7 +47,7 @@ export default function Notifications() {
         
         // Transform unread conversations into notification objects
         const chatNotifs = (convRes?.documents || [])
-          .filter(c => c.unreadCount > 0 && c.lastMessage)
+          .filter(c => c.unreadCount > 0 && c.lastMessage && c.lastMessageSenderId !== user.$id)
           .map(c => {
             const otherId = c.members.find(id => id !== user.$id) || "unknown";
             return {

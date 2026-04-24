@@ -5,6 +5,7 @@ import LogoutBtn from "./LogoutBtn";
 import { HeartIcon, MessageIcon, PlusSquareIcon, BellIcon } from "./ui/Icons";
 import { getHandle } from "../lib/ui";
 import notificationService from "../appwrite/notification";
+import messageService from "../appwrite/message";
 import { useEffect, useState } from "react";
 
 function ActionLink({ to, label, icon, badge = 0 }) {
@@ -44,8 +45,15 @@ export default function Navbar() {
     if (!user) return;
 
     async function checkNotifications() {
-      const count = await notificationService.countUnread(user.$id);
-      setUnreadCount(count);
+      const [notifCount, convRes] = await Promise.all([
+        notificationService.countUnread(user.$id),
+        messageService.getConversations(user.$id)
+      ]);
+      
+      const unreadChats = (convRes?.documents || [])
+        .filter(c => c.unreadCount > 0 && c.lastMessageSenderId !== user.$id).length;
+
+      setUnreadCount(notifCount + unreadChats);
     }
 
     checkNotifications();

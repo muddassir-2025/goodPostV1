@@ -141,6 +141,7 @@ class MessageService {
           {
             lastMessage: text,
             lastMessageAt: now,
+            lastMessageSenderId: senderId,
             unreadCount: (conversation.unreadCount || 0) + 1,
           }
         );
