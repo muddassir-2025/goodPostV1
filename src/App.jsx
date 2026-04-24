@@ -110,6 +110,16 @@ function App() {
               </ProtectedRoute>
             }
           />
+          
+          {/* Alias for favorite */}
+          <Route
+            path="/favorite"
+            element={
+              <ProtectedRoute>
+                <Favorites />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/profile"
