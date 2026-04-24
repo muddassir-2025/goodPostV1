@@ -234,23 +234,23 @@ export default function Chat() {
                     </span>
                   </div>
 
-                  {/* Actions (Hover) */}
+                  {/* Actions */}
                   {canEdit && (
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mx-2">
+                    <div className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex flex-col sm:flex-row items-center gap-1 mx-2 shrink-0">
                       <button 
                         onClick={() => {
                           setEditingMessageId(msg.$id);
                           setNewMessage(msg.text);
                         }}
-                        className="p-1.5 rounded-full bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition"
+                        className="p-2 sm:p-1.5 rounded-full bg-white/10 sm:bg-white/5 text-zinc-300 sm:text-zinc-400 hover:text-white hover:bg-white/20 sm:hover:bg-white/10 transition"
                       >
-                        <EditIcon className="h-3 w-3" />
+                        <EditIcon className="h-4 w-4 sm:h-3 sm:w-3" />
                       </button>
                       <button 
                         onClick={() => handleDelete(msg.$id)}
-                        className="p-1.5 rounded-full bg-white/5 text-zinc-400 hover:text-rose-500 hover:bg-rose-500/10 transition"
+                        className="p-2 sm:p-1.5 rounded-full bg-white/10 sm:bg-white/5 text-zinc-300 sm:text-zinc-400 hover:text-rose-500 hover:bg-rose-500/20 sm:hover:bg-rose-500/10 transition"
                       >
-                        <TrashIcon className="h-3 w-3" />
+                        <TrashIcon className="h-4 w-4 sm:h-3 sm:w-3" />
                       </button>
                     </div>
                   )}
