@@ -24,6 +24,7 @@ export default function EditPost() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [selectedTags, setSelectedTags] = useState([]);
+  const [customTag, setCustomTag] = useState("");
 
   const TAGS = ["Islamic", "Quran", "Knowledge", "Memes", "Audio", "Art", "Sports", "Travel", "Other"];
 
@@ -94,7 +95,7 @@ export default function EditPost() {
     event.preventDefault();
     setError("");
 
-    if (containsForbiddenWord(title) || containsForbiddenWord(content)) {
+    if (containsForbiddenWord(title) || containsForbiddenWord(content) || selectedTags.some(t => containsForbiddenWord(t))) {
       return setError("Post cannot be updated. It contains inappropriate language.");
     }
 
@@ -141,6 +142,17 @@ export default function EditPost() {
       setSaving(false);
     }
   }
+
+  const handleAddCustomTag = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const val = customTag.trim();
+      if (val && !selectedTags.includes(val) && val.length < 20) {
+        setSelectedTags([...selectedTags, val]);
+        setCustomTag("");
+      }
+    }
+  };
 
   if (loading) {
     return <PostSkeleton count={1} />;
@@ -217,11 +229,11 @@ export default function EditPost() {
             {/* TAGS */}
             <div className="space-y-2">
               <span className="text-sm font-medium text-zinc-300">
-                Update Tags (required)
+                Update or Add Tags (required)
               </span>
               
               <div className="flex flex-wrap gap-2 m-3">
-                {TAGS.map((tag) => {
+                {[...new Set([...TAGS, ...selectedTags])].map((tag) => {
                   const active = selectedTags.includes(tag);
 
                   return (
@@ -246,6 +258,15 @@ export default function EditPost() {
                   );
                 })}
               </div>
+
+              <input
+                type="text"
+                value={customTag}
+                onChange={(e) => setCustomTag(e.target.value)}
+                onKeyDown={handleAddCustomTag}
+                placeholder="Type custom tag & press Enter"
+                className="w-full rounded-[22px] border border-white/10 bg-black/35 px-4 py-2 text-sm text-white outline-none placeholder:text-zinc-600"
+              />
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">

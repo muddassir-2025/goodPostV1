@@ -21,6 +21,7 @@ export default function CreatePost() {
   const [error, setError] = useState("");
 
   const [selectedTags, setSelectedTags] = useState([]);
+  const [customTag, setCustomTag] = useState("");
 
   const TAGS = ["Islamic", "Quran", "Knowledge", "Memes", "Audio", "Art", "Sports", "Travel", "Other"];
 
@@ -50,7 +51,7 @@ export default function CreatePost() {
     if (!content.trim()) return setError("Please add a caption before publishing.");
     if (!selectedTags.length) return setError("Select at least one tag.");
 
-    if (containsForbiddenWord(title) || containsForbiddenWord(content)) {
+    if (containsForbiddenWord(title) || containsForbiddenWord(content) || selectedTags.some(t => containsForbiddenWord(t))) {
       return setError("Post cannot be created. It contains inappropriate language.");
     }
 
@@ -128,6 +129,17 @@ export default function CreatePost() {
       setLoading(false);
     }
   }
+
+  const handleAddCustomTag = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const val = customTag.trim();
+      if (val && !selectedTags.includes(val) && val.length < 20) {
+        setSelectedTags([...selectedTags, val]);
+        setCustomTag("");
+      }
+    }
+  };
 
   return (
     <div className="flex min-h-[calc(100vh-7rem)] items-center justify-center py-4">
@@ -211,14 +223,14 @@ export default function CreatePost() {
               />
             </label>
 
-            {/* TAGS (UNCHANGED UI STYLE) */}
+            {/* TAGS (UNCHANGED UI STYLE + CUSTOM INPUT) */}
             <div className="space-y-2">
               <span className="text-sm font-medium text-zinc-300">
-                Select Tags (required)
+                Select or Add Tags (required)
               </span>
               
               <div className="flex flex-wrap gap-2 m-3">
-                {TAGS.map((tag) => {
+                {[...new Set([...TAGS, ...selectedTags])].map((tag) => {
                   const active = selectedTags.includes(tag);
 
                   return (
@@ -243,6 +255,15 @@ export default function CreatePost() {
                   );
                 })}
               </div>
+
+              <input
+                type="text"
+                value={customTag}
+                onChange={(e) => setCustomTag(e.target.value)}
+                onKeyDown={handleAddCustomTag}
+                placeholder="Type custom tag & press Enter"
+                className="w-full rounded-[22px] border border-white/10 bg-black/35 px-4 py-2 text-sm text-white outline-none placeholder:text-zinc-600"
+              />
             </div>
 
             {/* UPLOADS */}

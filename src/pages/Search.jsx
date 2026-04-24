@@ -26,12 +26,15 @@ import { getFileUrl, getHandle, formatRelativeTime } from "../lib/ui";
 const CATEGORIES = [
   { id: "for-you", label: "For You" },
   { id: "trending", label: "Trending" },
-  { id: "Islamic", label: "Islamic" },
-  { id: "Quran", label: "Quran" },
+  { id: "islamic", label: "Islamic" },
+  { id: "quran", label: "Quran" },
+  { id: "knowledge", label: "Knowledge" },
   { id: "memes", label: "Memes" },
-  { id: "Nasheed", label: "Nasheed" },
+  { id: "audio", label: "Audio" },
   { id: "art", label: "Art" },
-  { id: "Quote", label: "Quotes" },
+  { id: "sports", label: "Sports" },
+  { id: "travel", label: "Travel" },
+  {id : "other", label: "Other"},
 ];
 
 export default function Search() {
@@ -98,15 +101,22 @@ export default function Search() {
     const topicMap = {};
     posts.forEach(p => {
       p.tags?.forEach(tag => {
-        if (!topicMap[tag]) {
-          topicMap[tag] = { name: tag, count: 0, authors: new Set() };
+        const lower = tag.toLowerCase();
+        if (!topicMap[lower]) {
+          topicMap[lower] = { name: tag, count: 0, authors: new Set() };
         }
-        topicMap[tag].count++;
-        topicMap[tag].authors.add(p.authorName);
+        topicMap[lower].count++;
+        topicMap[lower].authors.add(p.authorName);
       });
     });
     return Object.values(topicMap).sort((a, b) => b.count - a.count);
   }, [posts]);
+
+  const matchingTags = useMemo(() => {
+    if (!debouncedQuery) return [];
+    const lowerQ = debouncedQuery.toLowerCase();
+    return trendingTopics.filter(t => t.name.toLowerCase().includes(lowerQ));
+  }, [trendingTopics, debouncedQuery]);
 
   const updateUrl = (params) => {
     setSearchParams(prev => {
@@ -283,7 +293,7 @@ export default function Search() {
             {!isFullList && !debouncedQuery && activeCategory === "trending" && (
               <div className="divide-y divide-white/10">
                 {trendingTopics.map(topic => (
-                   <button key={topic.name} onClick={() => handleTabChange(topic.name)} className="flex w-full items-start justify-between p-5 text-left transition hover:bg-white/[0.03]">
+                   <button key={topic.name} onClick={() => navigate(`/tag/${topic.name.toLowerCase()}`)} className="flex w-full items-start justify-between p-5 text-left transition hover:bg-white/[0.03]">
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] text-zinc-500">Trending</p>
                       <h2 className="mt-1 text-[16px] font-extrabold text-white">#{topic.name}</h2>
@@ -297,8 +307,27 @@ export default function Search() {
 
             {(isFullList || debouncedQuery || activeCategory === "for-you") && (
               <div className="divide-y divide-white/10 animate-in fade-in duration-500">
+                
+                {/* MATCHING TAGS WHEN SEARCHING */}
+                {debouncedQuery && matchingTags.length > 0 && (
+                  <div className="p-5 border-b border-white/5">
+                    <p className="text-xs uppercase tracking-widest text-zinc-500 mb-3">Popular Tags</p>
+                    <div className="flex flex-wrap gap-2">
+                      {matchingTags.slice(0, 5).map(tag => (
+                        <button
+                          key={tag.name}
+                          onClick={() => navigate(`/tag/${tag.name.toLowerCase()}`)}
+                          className="px-4 py-2 rounded-full border border-white/10 bg-white/5 text-sm font-medium hover:bg-white/10 transition"
+                        >
+                          #{tag.name} <span className="text-zinc-500 ml-1 text-xs">({tag.count})</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {results.length > 0 ? results.map((p, idx) => renderPostItem(p, idx, false)) : (
-                  <div className="p-10 text-center"><EmptyState title="No results found" description="Try another category" /></div>
+                  <div className="p-10 text-center"><EmptyState title="No results found" description="Try another search or category" /></div>
                 )}
               </div>
             )}
