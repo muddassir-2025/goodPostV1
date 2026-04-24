@@ -4,8 +4,10 @@ import { Link, useNavigate } from "react-router-dom";
 import Avatar from "../components/Avatar";
 import EmptyState from "../components/EmptyState";
 import notificationService from "../appwrite/notification";
+import messageService from "../appwrite/message";
+import postService from "../appwrite/post";
 import { formatRelativeTime } from "../lib/ui";
-import { BellIcon, HeartIcon, CommentIcon, UserIcon } from "../components/ui/Icons";
+import { BellIcon, HeartIcon, CommentIcon, UserIcon, MessageIcon } from "../components/ui/Icons";
 
 export default function Notifications() {
   const user = useSelector((state) => state.auth.userData);
@@ -19,23 +21,83 @@ export default function Notifications() {
       return;
     }
 
-    async function loadNotifications() {
-      try {
-        const res = await notificationService.getUserNotifications(user.$id);
-        setNotifications(res?.documents || []);
+    let active = true;
 
-        // Mark as read after 2 seconds of opening the page
-        setTimeout(() => {
-          notificationService.markAllAsRead(user.$id);
-        }, 2000);
+    async function loadAllNotifications() {
+      try {
+        const [notifRes, convRes, postsRes] = await Promise.all([
+          notificationService.getUserNotifications(user.$id),
+          messageService.getConversations(user.$id),
+          postService.getPosts() // Used to find user names
+        ]);
+
+        if (!active) return;
+
+        // Build a user map for faster lookups
+        const userMap = {};
+        if (postsRes?.documents) {
+          postsRes.documents.forEach(p => {
+            if (p.authorID && p.authorName) {
+              userMap[p.authorID] = p.authorName;
+            }
+          });
+        }
+
+        const regularNotifs = notifRes?.documents || [];
+        
+        // Transform unread conversations into notification objects
+        const chatNotifs = (convRes?.documents || [])
+          .filter(c => c.unreadCount > 0 && c.lastMessage)
+          .map(c => {
+            const otherId = c.members.find(id => id !== user.$id) || "unknown";
+            return {
+              $id: `chat_${c.$id}`,
+              conversationId: c.$id,
+              type: "chat",
+              actorId: otherId,
+              actorName: userMap[otherId] || "Someone",
+              content: c.lastMessage,
+              $createdAt: c.lastMessageAt,
+              isRead: false
+            };
+          });
+
+        const merged = [...regularNotifs, ...chatNotifs].sort((a, b) => 
+          new Date(b.$createdAt) - new Date(a.$createdAt)
+        );
+
+        setNotifications(merged);
+
+        // Mark regular notifications as read after 2 seconds
+        if (regularNotifs.some(n => !n.isRead)) {
+          setTimeout(() => {
+            if (active) notificationService.markAllAsRead(user.$id);
+          }, 2000);
+        }
       } catch (error) {
-        console.error(error);
+        console.error("Failed to load notifications:", error);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
 
-    loadNotifications();
+    loadAllNotifications();
+
+    // Subscribe to realtime notifications
+    const unsubNotifs = notificationService.subscribeToNotifications(user.$id, () => {
+      loadAllNotifications();
+    });
+
+    // Subscribe to realtime conversations (chats)
+    const unsubChats = messageService.subscribeToConversations(user.$id, () => {
+      loadAllNotifications();
+    });
+
+    return () => {
+      active = false;
+      unsubNotifs();
+      unsubChats();
+    };
   }, [user, navigate]);
 
   if (loading) {
@@ -96,6 +158,11 @@ export default function Notifications() {
             color = "text-green-400";
             actionText = "started following you.";
             link = `/profile/${notif.actorId}`;
+          } else if (notif.type === "chat") {
+            Icon = MessageIcon;
+            color = "text-blue-500";
+            actionText = "sent you a message.";
+            link = `/messages/${notif.conversationId}`;
           }
 
           return (
@@ -107,7 +174,7 @@ export default function Notifications() {
               }`}
             >
               <div className="relative mt-1">
-                <Avatar name={notif.actorId} size="md" />
+                <Avatar name={notif.actorName} size="md" />
                 <div className={`absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black ${color}`}>
                   <Icon className="h-3 w-3" filled />
                 </div>
@@ -116,15 +183,18 @@ export default function Notifications() {
               <div className="flex-1">
                 <p className="text-sm text-zinc-300 leading-relaxed">
                   <span className="font-semibold text-white">
-                    {notif.actorName || "Someone"}
+                    {notif.actorName}
                   </span>{" "}
                   {actionText}
                 </p>
 
-                {notif.type === "comment" && notif.content && (
+                {(notif.type === "comment" || notif.type === "chat") && notif.content && (
                   <div className="mt-2 rounded-2xl border border-white/5 bg-white/5 p-3">
                     <p className="line-clamp-2 text-xs text-zinc-400 italic">
-                      "{notif.content}"
+                      {notif.type === "chat" && notif.content === "🚫 This message was deleted" 
+                        ? "🚫 This message was deleted"
+                        : `"${notif.content}"`
+                      }
                     </p>
                   </div>
                 )}

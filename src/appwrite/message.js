@@ -220,6 +220,23 @@ class MessageService {
       }
     );
   }
+
+  // ✅ Real-time subscription for conversations
+  subscribeToConversations(userId, callback) {
+    return this.client.subscribe(
+      `databases.${this.databaseId}.collections.${this.conversationsId}.documents`,
+      (response) => {
+        if (
+          response.events.includes(`databases.${this.databaseId}.collections.${this.conversationsId}.documents.*.create`) ||
+          response.events.includes(`databases.${this.databaseId}.collections.${this.conversationsId}.documents.*.update`)
+        ) {
+           if (response.payload.members.includes(userId)) {
+             callback(response.payload);
+           }
+        }
+      }
+    );
+  }
 }
 
 const messageService = new MessageService();

@@ -152,6 +152,24 @@ class NotificationService {
       console.error("Mark all read error:", error);
     }
   }
+
+  // ✅ Real-time subscription
+  subscribeToNotifications(userId, callback) {
+    return this.client.subscribe(
+      `databases.${this.databaseId}.collections.${this.notificationsCollectionId}.documents`,
+      (response) => {
+        if (
+          response.events.includes(`databases.${this.databaseId}.collections.${this.notificationsCollectionId}.documents.*.create`) ||
+          response.events.includes(`databases.${this.databaseId}.collections.${this.notificationsCollectionId}.documents.*.update`) ||
+          response.events.includes(`databases.${this.databaseId}.collections.${this.notificationsCollectionId}.documents.*.delete`)
+        ) {
+           if (response.payload.userId === userId) {
+             callback(response.payload, response.events);
+           }
+        }
+      }
+    );
+  }
 }
 
 const notificationService = new NotificationService();
