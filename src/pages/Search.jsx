@@ -11,15 +11,11 @@ import {
   TrendingIcon, 
   HeartIcon, 
   CommentIcon, 
-  ImageIcon, 
   AudioIcon,
   PlayIcon,
-  UserIcon,
-  DotsIcon
 } from "../components/ui/Icons";
 
-import postService from "../appwrite/post";
-import { fetchFeedPosts, sortPosts, rankPostsForYou } from "../lib/posts";
+import { fetchFeedPosts, rankPostsForYou } from "../lib/posts";
 import { getFileUrl, getHandle, formatRelativeTime } from "../lib/ui";
 
 const CATEGORIES = [
@@ -37,24 +33,14 @@ export default function Search() {
   const user = useSelector((state) => state.auth.userData);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const initialQuery = searchParams.get("q") || "";
-
+  
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState(initialQuery);
+  const [query, setQuery] = useState(searchParams.get("q") || "");
   const [activeCategory, setActiveCategory] = useState("for-you");
-  const [showDropdown, setShowDropdown] = useState(false);
   const [isFullList, setIsFullList] = useState(false);
   
   const debouncedQuery = useDebounce(query, 300);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    if (initialQuery) {
-      setQuery(initialQuery);
-      setIsFullList(true);
-    }
-  }, [initialQuery]);
 
   useEffect(() => {
     let active = true;
@@ -74,35 +60,24 @@ export default function Search() {
   // 🎯 RESULT FILTERING
   const results = useMemo(() => {
     let filtered = posts;
-    const lowerQuery = debouncedQuery.toLowerCase();
-
     if (debouncedQuery) {
       filtered = posts.filter(p => {
         const text = `${p.title} ${p.content} ${p.authorName} ${p.tags?.join(" ")}`.toLowerCase();
-        return text.includes(lowerQuery);
+        return text.includes(debouncedQuery.toLowerCase());
       });
       return rankPostsForYou(filtered);
     }
-
     if (activeCategory === "for-you") return rankPostsForYou(posts);
     if (activeCategory === "trending") return [];
-    
-    return posts.filter(p => 
-      p.tags?.some(t => t.toLowerCase() === activeCategory.toLowerCase())
-    );
+    return posts.filter(p => p.tags?.some(t => t.toLowerCase() === activeCategory.toLowerCase()));
   }, [posts, debouncedQuery, activeCategory]);
 
   const trendingTopics = useMemo(() => {
     const topicMap = {};
-    posts.forEach(p => {
-      p.tags?.forEach(tag => {
-        if (!topicMap[tag]) {
-          topicMap[tag] = { name: tag, count: 0, authors: new Set() };
-        }
-        topicMap[tag].count++;
-        topicMap[tag].authors.add(p.authorName);
-      });
-    });
+    posts.forEach(p => p.tags?.forEach(tag => {
+      if (!topicMap[tag]) topicMap[tag] = { name: tag, count: 0 };
+      topicMap[tag].count++;
+    }));
     return Object.values(topicMap).sort((a, b) => b.count - a.count);
   }, [posts]);
 
@@ -112,95 +87,96 @@ export default function Search() {
     setIsFullList(false);
   };
 
-  const handlePostClick = (post) => {
-    navigate(`/post/${post.slug}`);
-  };
-
-  const renderPostItem = (post, compact = false) => (
+  // 🍱 HYBRID CARD (Instagram Visual + Twitter Text)
+  const renderHybridCard = (post, featured = false) => (
     <div
       key={post.$id}
-      className={`group w-full transition duration-300 hover:bg-white/[0.04] ${compact ? 'py-3' : 'py-5'}`}
+      onClick={() => navigate(`/post/${post.slug}`)}
+      className={`group relative flex w-full cursor-pointer overflow-hidden transition duration-300 hover:bg-white/[0.04] ${
+        featured ? "flex-col p-0" : "items-center gap-4 p-4"
+      }`}
     >
-      <div className="flex gap-4 cursor-pointer" onClick={() => handlePostClick(post)}>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-xs text-zinc-500 mb-1.5">
-            <Avatar name={post.authorName} size="xs" />
-            <span className="font-semibold text-zinc-400 group-hover:text-white transition">
-                {getHandle(post.authorName)}
-            </span>
-            <span>·</span>
-            <span>{formatRelativeTime(post.$createdAt)}</span>
-          </div>
-          
-          <h3 className={`font-display font-bold text-white leading-tight group-hover:text-blue-400 transition-colors ${compact ? 'text-[16px]' : 'text-[19px]'}`}>
-            {post.title}
-          </h3>
-          
-          {!compact && post.content && (
-            <p className="mt-2 line-clamp-2 text-[14px] text-zinc-400 leading-relaxed">
-              {post.content}
-            </p>
-          )}
-
-          <div className="mt-4 flex items-center gap-5 text-zinc-500">
-            <span className="flex items-center gap-1.5 text-[11px] font-medium tracking-wider uppercase">
-              <CommentIcon className="h-3.5 w-3.5" /> {post.commentCount}
-            </span>
-            <span className="flex items-center gap-1.5 text-[11px] font-medium tracking-wider uppercase">
-              <HeartIcon className="h-3.5 w-3.5" /> {post.likeCount}
-            </span>
-          </div>
-        </div>
-
-        {post.featuredImg && (
-          <div className={`flex-shrink-0 overflow-hidden rounded-[24px] border border-white/10 bg-[#121212] ${compact ? 'h-20 w-20' : 'h-28 w-28'}`}>
-            <img 
-              src={getFileUrl(post.featuredImg)} 
-              className="h-full w-full object-cover transition duration-700 group-hover:scale-110" 
-            />
+      {/* Visual Content (Instagram Vibe) */}
+      <div className={`relative flex-shrink-0 overflow-hidden bg-zinc-900 ${
+        featured ? "aspect-[16/9] w-full" : "h-20 w-20 rounded-2xl border border-white/10"
+      }`}>
+        {post.featuredImg ? (
+          <img src={getFileUrl(post.featuredImg)} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-800 to-black">
+             {post.audioId ? <AudioIcon className="h-8 w-8 text-white/20" /> : <TrendingIcon className="h-8 w-8 text-white/20" />}
           </div>
         )}
+        {post.audioId && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-md">
+                    <PlayIcon className="h-5 w-5 text-white" />
+                </div>
+            </div>
+        )}
+      </div>
+
+      {/* Text Content (Twitter/X Vibe) */}
+      <div className={featured ? "p-5" : "flex-1 min-w-0"}>
+        <div className="flex items-center gap-2 text-xs text-zinc-500 mb-1">
+          <Avatar name={post.authorName} size="xs" />
+          <span className="font-semibold text-zinc-400 group-hover:text-white transition">{getHandle(post.authorName)}</span>
+          <span>·</span>
+          <span>{formatRelativeTime(post.$createdAt)}</span>
+        </div>
+        
+        <h3 className={`font-display font-bold text-white leading-snug group-hover:text-blue-400 transition-colors ${
+          featured ? "text-xl" : "text-[15px] truncate"
+        }`}>
+          {post.title}
+        </h3>
+        
+        {featured && post.content && (
+          <p className="mt-2 line-clamp-2 text-sm text-zinc-400">{post.content}</p>
+        )}
+
+        <div className="mt-3 flex items-center gap-4 text-zinc-500">
+           <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider"><CommentIcon className="h-3.5 w-3.5" /> {post.commentCount}</span>
+           <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-rose-500/80"><HeartIcon className="h-3.5 w-3.5" /> {post.likeCount}</span>
+        </div>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen space-y-6 pb-24">
-      {/* 🔍 HEADER (Glassmorphic) */}
-      <section className="sticky top-16 z-40 -mx-2 bg-black/60 backdrop-blur-2xl md:top-20 md:mx-0 md:rounded-[32px] md:border md:border-white/10 md:p-1">
-        <div className="flex flex-col gap-1 p-4">
-          <div className="relative flex-1" ref={dropdownRef}>
-            <div className="flex items-center gap-3 rounded-[24px] border border-white/10 bg-white/5 px-4 py-3 focus-within:border-white/20 focus-within:bg-white/10 transition-all">
-              <SearchIcon className="h-5 w-5 text-zinc-500" />
-              <input
+    <div className="min-h-screen space-y-5 pb-24">
+      {/* 🔍 SEARCH BAR */}
+      <section className="sticky top-16 z-40 -mx-4 bg-black/60 px-4 pb-3 pt-2 backdrop-blur-xl md:top-20 md:mx-0 md:px-0">
+        <div className="relative mb-4">
+            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 focus-within:bg-white/10 transition-all">
+                <SearchIcon className="h-5 w-5 text-zinc-500" />
+                <input
                 type="text"
                 value={query}
                 onChange={(e) => {
-                  setQuery(e.target.value);
-                  if (e.target.value) setIsFullList(true);
+                    setQuery(e.target.value);
+                    if (e.target.value) setIsFullList(true);
                 }}
-                placeholder="Explore the feed..."
+                placeholder="Search GoodPost"
                 className="w-full bg-transparent text-[15px] text-white outline-none placeholder:text-zinc-500"
-              />
+                />
             </div>
-          </div>
+        </div>
 
-          {/* 📑 TABS */}
-          <div className="hide-scrollbar mt-2 flex gap-1 overflow-x-auto">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => handleTabChange(cat.id)}
-                className={`rounded-full px-5 py-2.5 text-sm font-semibold transition-all whitespace-nowrap ${
-                  activeCategory === cat.id && !query
-                    ? "bg-white text-black shadow-[0_10px_30px_rgba(255,255,255,0.2)]"
-                    : "text-zinc-400 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
+        <div className="hide-scrollbar flex gap-2 overflow-x-auto">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => handleTabChange(cat.id)}
+              className={`rounded-full px-5 py-2 text-sm font-bold transition-all whitespace-nowrap ${
+                activeCategory === cat.id && !query
+                  ? "bg-white text-black"
+                  : "border border-white/10 bg-white/5 text-zinc-400 hover:text-white"
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
         </div>
       </section>
 
@@ -209,82 +185,61 @@ export default function Search() {
           <PostSkeleton count={3} />
         ) : (
           <>
-            {/* 🎯 DISCOVERY VIEW (The Glass Card) */}
+            {/* 🎯 DISCOVERY (1 Featured + 3 List) */}
             {!isFullList && !debouncedQuery && activeCategory !== "for-you" && activeCategory !== "trending" && (
-              <section className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <div className="overflow-hidden rounded-[32px] border border-white/10 bg-[#121212]/90 p-6 shadow-[0_30px_90px_rgba(0,0,0,0.34)] backdrop-blur-xl">
-                  <div className="mb-6 flex items-center justify-between">
-                    <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-500">Discovery</p>
-                        <h2 className="font-display mt-1 text-2xl text-white">Top in {activeCategory}</h2>
-                    </div>
-                    <TrendingIcon className="h-6 w-6 text-zinc-600" />
-                  </div>
-                  
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="overflow-hidden rounded-[32px] border border-white/10 bg-[#121212]/90 shadow-2xl backdrop-blur-xl">
                   {results.length > 0 ? (
                     <div className="divide-y divide-white/5">
-                      {/* Featured Highlight */}
-                      {renderPostItem(results[0], false)}
+                      {/* Instagram Vibe Header */}
+                      {renderHybridCard(results[0], true)}
                       
-                      {/* Compact Threads */}
-                      <div className="mt-2 divide-y divide-white/5">
-                        {results.slice(1, 5).map((post) => renderPostItem(post, true))}
-                      </div>
+                      {/* Twitter Vibe List */}
+                      {results.slice(1, 4).map((post) => renderHybridCard(post, false))}
                       
                       <button 
                         onClick={() => setIsFullList(true)}
-                        className="mt-4 flex w-full items-center justify-center rounded-[20px] bg-white/5 py-4 text-sm font-bold text-zinc-300 transition hover:bg-white/10 hover:text-white"
+                        className="w-full py-4 text-center text-sm font-bold text-blue-400 hover:bg-white/5 transition"
                       >
-                        Show all {results.length} posts in {activeCategory}
+                        See more in {activeCategory}
                       </button>
                     </div>
                   ) : (
-                    <EmptyState title={`No posts in ${activeCategory}`} description="Be the first to share something!" />
+                    <div className="p-10 text-center"><EmptyState title={`No ${activeCategory} yet`} description="Start the trend!" /></div>
                   )}
                 </div>
-              </section>
+              </div>
             )}
 
-            {/* 📈 TRENDING DIRECTORY (Glass Card) */}
+            {/* 📈 TRENDING (Clean Directory) */}
             {!isFullList && !debouncedQuery && activeCategory === "trending" && (
-              <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[#121212]/90 p-2 shadow-[0_30px_90px_rgba(0,0,0,0.34)] backdrop-blur-xl animate-in fade-in duration-500">
-                <div className="p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-rose-500">Live Trends</p>
-                    <h2 className="font-display mt-1 text-2xl text-white">Global Topics</h2>
-                </div>
-                <div className="divide-y divide-white/5">
-                  {trendingTopics.map(topic => (
-                    <button
-                      key={topic.name}
-                      onClick={() => {
-                        setActiveCategory(topic.name);
-                        setIsFullList(true);
-                      }}
-                      className="group flex w-full items-center justify-between p-5 text-left transition hover:bg-white/[0.04]"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 transition group-hover:text-rose-400">Trending Now</p>
-                        <h2 className="mt-1 font-display text-[20px] text-white transition group-hover:translate-x-1">#{topic.name}</h2>
-                        <p className="mt-1 text-xs text-zinc-500">{topic.count} posts shared today</p>
-                      </div>
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 text-zinc-400 transition group-hover:bg-white/10 group-hover:text-white">
-                        <DotsIcon className="h-5 w-5" />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </section>
+              <div className="rounded-[32px] border border-white/10 bg-[#121212]/90 p-2 shadow-2xl backdrop-blur-xl divide-y divide-white/5">
+                {trendingTopics.map(topic => (
+                  <button
+                    key={topic.name}
+                    onClick={() => { setActiveCategory(topic.name); setIsFullList(true); }}
+                    className="flex w-full items-center justify-between p-5 text-left hover:bg-white/[0.04] transition"
+                  >
+                    <div>
+                      <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Trending</p>
+                      <h2 className="font-display text-lg text-white">#{topic.name}</h2>
+                      <p className="text-xs text-zinc-500">{topic.count} posts</p>
+                    </div>
+                    <TrendingIcon className="h-5 w-5 text-zinc-700" />
+                  </button>
+                ))}
+              </div>
             )}
 
-            {/* 🏁 FEED VIEW (Matching Home Style) */}
+            {/* 🏁 FEED VIEW (Simple List) */}
             {(isFullList || debouncedQuery || activeCategory === "for-you") && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <div className="space-y-4 animate-in fade-in duration-500">
                 {results.length > 0 ? results.map((p) => (
-                   <div key={p.$id} className="overflow-hidden rounded-[32px] border border-white/10 bg-[#121212]/90 p-1 shadow-[0_20px_60px_rgba(0,0,0,0.2)] backdrop-blur-xl">
-                      {renderPostItem(p, false)}
+                   <div key={p.$id} className="overflow-hidden rounded-[32px] border border-white/10 bg-[#121212]/90 p-1 shadow-md">
+                      {renderHybridCard(p, false)}
                    </div>
                 )) : (
-                  <EmptyState title="No results found" description="Try another category" />
+                  <EmptyState title="No results found" description="Try another search" />
                 )}
               </div>
             )}
