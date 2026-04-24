@@ -14,391 +14,310 @@ import { fetchFeedPosts, filterPosts, sortPosts } from "../lib/posts";
 import { buildStories } from "../lib/ui";
 import { motion, AnimatePresence } from "framer-motion";
 
-const filters = [
-  { id: "discovery", label: "For You" },
-  { id: "following", label: "Following" },
-  { id: "latest", label: "Latest" },
-  { id: "likes", label: "Popular" },
+const FEED_FILTERS = [
+  { id: "discovery", label: "For You"    },
+  { id: "following", label: "Following"  },
+  { id: "latest",    label: "Latest"     },
+  { id: "likes",     label: "Popular"    },
+];
+
+const MEDIA_FILTERS = [
+  { id: "all",    label: "All"    },
+  { id: "images", label: "Images" },
+  { id: "audio",  label: "Audio"  },
 ];
 
 export default function Home() {
-  const user = useSelector((state) => state.auth.userData);
+  const user     = useSelector((state) => state.auth.userData);
   const navigate = useNavigate();
 
-  const [posts, setPosts] = useState([]);
-  const [stories, setStories] = useState([]); 
-  const [allowedUsers, setAllowedUsers] = useState(new Set()); // ✅ NEW
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("discovery");
-  const [mediaFilter, setMediaFilter] = useState("all"); // all, images, audio
-
-  // ✅ INFINITE SCROLL STATE
+  const [posts,        setPosts]        = useState([]);
+  const [stories,      setStories]      = useState([]);
+  const [allowedUsers, setAllowedUsers] = useState(new Set());
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState("");
+  const [search,       setSearch]       = useState("");
+  const [filter,       setFilter]       = useState("discovery");
+  const [mediaFilter,  setMediaFilter]  = useState("all");
   const [visibleCount, setVisibleCount] = useState(5);
-  const loaderRef = useRef(null);
-
+  const loaderRef      = useRef(null);
   const deferredSearch = useDeferredValue(search);
 
+  /* ── load feed ── */
   useEffect(() => {
     let active = true;
-
     async function loadFeed() {
       setLoading(true);
       setError("");
-
       try {
-        const data = await fetchFeedPosts(user);
-
-        const followingIds = user
-          ? await followService.getFollowing(user.$id)
-          : [];
-
-        const allowed = user
-          ? new Set([user.$id, ...followingIds])
-          : new Set();
-
-        const storyPosts = data.filter((post) =>
-          allowed.has(post.authorID)
-        );
-
-        let builtStories = buildStories(storyPosts, user);
-
-        builtStories = builtStories.sort(
-          (a, b) => Number(b.isOwn) - Number(a.isOwn)
-        );
-
-        if (active) {
-          setPosts(data);          
-          setStories(builtStories); 
-          setAllowedUsers(allowed); // ✅ NEW
-        }
+        const data         = await fetchFeedPosts(user);
+        const followingIds = user ? await followService.getFollowing(user.$id) : [];
+        const allowed      = user ? new Set([user.$id, ...followingIds]) : new Set();
+        const storyPosts   = data.filter((post) => allowed.has(post.authorID));
+        let builtStories   = buildStories(storyPosts, user)
+          .sort((a, b) => Number(b.isOwn) - Number(a.isOwn));
+        if (active) { setPosts(data); setStories(builtStories); setAllowedUsers(allowed); }
       } catch (err) {
         console.error(err);
-        if (active) {
-          setError("Could not load the feed right now.");
-        }
+        if (active) setError("Could not load the feed right now.");
       } finally {
-        if (active) {
-          setLoading(false);
-        }
+        if (active) setLoading(false);
       }
     }
-
     loadFeed();
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [user]);
 
-  const searchFiltered = filterPosts(posts, deferredSearch);
-  const feedFiltered = filter === "following" 
-    ? searchFiltered.filter((p) => allowedUsers.has(p.authorID) && p.authorID !== user?.$id)
-    : searchFiltered;
-
-  const mediaFiltered = feedFiltered.filter(p => {
-    if (mediaFilter === "images") return !!p.featuredImg;
-    if (mediaFilter === "audio") return !!p.audioId;
-    return true;
-  });
-
-  const visiblePosts = sortPosts(mediaFiltered, filter === "following" ? "latest" : filter);
-
-  // ✅ INFINITE SCROLL OBSERVER
+  /* ── infinite scroll ── */
   useEffect(() => {
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setVisibleCount((prev) => prev + 5);
-        }
-      },
+      (entries) => { if (entries[0].isIntersecting) setVisibleCount((prev) => prev + 5); },
       { threshold: 0.1 }
     );
-
-    if (loaderRef.current) {
-      observer.observe(loaderRef.current);
-    }
-
+    if (loaderRef.current) observer.observe(loaderRef.current);
     return () => observer.disconnect();
-  }, [visiblePosts]);
+  }, []);
 
+  /* ── derived posts ── */
+  const searchFiltered = filterPosts(posts, deferredSearch);
+  const feedFiltered   = filter === "following"
+    ? searchFiltered.filter((p) => allowedUsers.has(p.authorID) && p.authorID !== user?.$id)
+    : searchFiltered;
+  const mediaFiltered  = feedFiltered.filter((p) => {
+    if (mediaFilter === "images") return !!p.featuredImg;
+    if (mediaFilter === "audio")  return !!p.audioId;
+    return true;
+  });
+  const visiblePosts = sortPosts(mediaFiltered, filter === "following" ? "latest" : filter);
+
+  /* ── post actions ── */
   function updatePost(postId, updater) {
-    setPosts((current) =>
-      current.map((post) =>
-        post.$id === postId ? updater(post) : post
-      )
-    );
+    setPosts((cur) => cur.map((p) => (p.$id === postId ? updater(p) : p)));
   }
 
   async function handleLikeToggle(post) {
-    if (!user) {
-      navigate("/login");
-      return;
-    }
-
+    if (!user) { navigate("/login"); return; }
     const nextLiked = !post.liked;
-
-    updatePost(post.$id, (current) => ({
-      ...current,
-      liked: nextLiked,
-      likeCount: Math.max(
-        (current.likeCount || 0) + (nextLiked ? 1 : -1),
-        0
-      ),
-    }));
-
+    updatePost(post.$id, (cur) => ({ ...cur, liked: nextLiked, likeCount: Math.max((cur.likeCount || 0) + (nextLiked ? 1 : -1), 0) }));
     try {
-      await syncLike({
-        postId: post.$id,
-        userId: user.$id,
-        userName: user.name,
-        currentlyLiked: post.liked,
-      });
+      await syncLike({ postId: post.$id, userId: user.$id, userName: user.name, currentlyLiked: post.liked });
     } catch {
-      updatePost(post.$id, (current) => ({
-        ...current,
-        liked: post.liked,
-        likeCount: post.likeCount || 0,
-      }));
+      updatePost(post.$id, (cur) => ({ ...cur, liked: post.liked, likeCount: post.likeCount || 0 }));
     }
   }
 
   async function handleFavoriteToggle(post) {
-    if (!user) {
-      navigate("/login");
-      return;
-    }
-
+    if (!user) { navigate("/login"); return; }
     const nextSaved = !post.saved;
-
-    updatePost(post.$id, (current) => ({
-      ...current,
-      liked: nextSaved,
-      favoriteId: nextSaved ? current.favoriteId : null,
-    }));
-
+    updatePost(post.$id, (cur) => ({ ...cur, liked: nextSaved, favoriteId: nextSaved ? cur.favoriteId : null }));
     try {
-      const result = await syncFavorite({
-        postId: post.$id,
-        userId: user.$id,
-        currentlySaved: post.saved,
-        favoriteId: post.favoriteId,
-      });
-
-      updatePost(post.$id, (current) => ({
-        ...current,
-        saved: result.saved,
-        favoriteId: result.favoriteId,
-      }));
+      const result = await syncFavorite({ postId: post.$id, userId: user.$id, currentlySaved: post.saved, favoriteId: post.favoriteId });
+      updatePost(post.$id, (cur) => ({ ...cur, saved: result.saved, favoriteId: result.favoriteId }));
     } catch {
-      updatePost(post.$id, (current) => ({
-        ...current,
-        saved: post.saved,
-        favoriteId: post.favoriteId || null,
-      }));
+      updatePost(post.$id, (cur) => ({ ...cur, saved: post.saved, favoriteId: post.favoriteId || null }));
     }
   }
 
   async function handleDelete(post) {
     try {
-      if (post.featuredImg) {
-        await postService.deleteFile(post.featuredImg);
-      }
-
-      if (post.audioId) {
-        await postService.deleteFile(post.audioId);
-      }
-
+      if (post.featuredImg) await postService.deleteFile(post.featuredImg);
+      if (post.audioId)     await postService.deleteFile(post.audioId);
       await postService.deletePost(post.$id);
-
-      setPosts((current) =>
-        current.filter((item) => item.$id !== post.$id)
-      );
+      setPosts((cur) => cur.filter((item) => item.$id !== post.$id));
     } catch {
       setError("Delete failed. Please try again.");
     }
   }
 
   async function handleReport(postId) {
-    if (!user) {
-      navigate("/login");
-      return;
-    }
-
+    if (!user) { navigate("/login"); return; }
     const ok = await confirm("Report this post for inappropriate content? If 5 users report it, it will be automatically removed.");
     if (!ok) return;
-
     try {
       const res = await postService.reportPost(postId, user.$id);
-      
-      if (res.status === "deleted") {
-        setPosts(prev => prev.filter(p => p.$id !== postId));
-        toast("Post removed after multiple reports.", "warning");
-      } else if (res.status === "already_reported") {
-        toast("You have already reported this post.", "info");
-      } else {
-        toast("Report submitted successfully.", "success");
-      }
+      if      (res.status === "deleted")          { setPosts((prev) => prev.filter((p) => p.$id !== postId)); toast("Post removed after multiple reports.", "warning"); }
+      else if (res.status === "already_reported") { toast("You have already reported this post.", "info"); }
+      else                                        { toast("Report submitted successfully.", "success"); }
     } catch {
       setError("Report failed. Please try again.");
     }
   }
 
   return (
-    <div className="space-y-5">
-      {/* HEADER */}
-      <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[#121212]/90 p-5 shadow-[0_30px_90px_rgba(0,0,0,0.34)] backdrop-blur-xl">
-        <p className="text-xs uppercase tracking-[0.32em] text-zinc-500">
-          Feed
-        </p>
+    <div className="min-h-screen bg-[#0a0a0b] text-white">
 
-        <div className="mt-3 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="font-display text-xl text-white">
-            IN THE NAME OF GOD — 
-            WHERE NEW HAPPINESS BEGINS.
-            </h1>
-            <p className="mt-2 max-w-md text-sm leading-6 text-zinc-400">
-              Use the internet as a tool for good, not distraction. What you share will count for or against you.
-            </p>
+      {/* ── HEADER ── */}
+      <div className="relative overflow-hidden border-b border-white/[0.06]">
+
+        {/* Ambient glow */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 h-64 w-64 rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(99,102,241,0.07) 0%, transparent 70%)" }}
+        />
+
+        <div className="relative px-5 pt-7 pb-5 space-y-5">
+
+          {/* Title row */}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] uppercase tracking-widest text-white/25 mb-1.5">
+                Home
+              </p>
+              <h1 className="text-[22px] font-extrabold text-white leading-snug max-w-xs">
+                In the name of God —{" "}
+                <span className="text-white/50">where good begins.</span>
+              </h1>
+              <p className="mt-2 text-[13px] text-white/35 leading-relaxed max-w-sm">
+                Use the internet as a tool for good. What you share will count for or against you.
+              </p>
+            </div>
+
+            <Link
+              to={user ? "/create" : "/login"}
+              className="flex-shrink-0 hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-full bg-white text-black text-[13px] font-semibold hover:bg-white/90 transition-colors"
+            >
+              + Share
+            </Link>
           </div>
 
-          <Link
-            to={user ? "/create" : "/login"}
-            className="hidden rounded-full bg-grey-400 px-4 py-2 text-sm font-semibold text-black hover:bg-zinc-700 sm:inline-flex"
-          >
-            Share
-          </Link>
-        </div>
-
-        {/* SEARCH */}
-        <div className="mt-5 rounded-[26px] border border-white/10 bg-black/35 p-3">
-          <label className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/6 text-zinc-400">
-              <SearchIcon className="h-5 w-5" />
-            </span>
-
+          {/* Search bar */}
+          <div className="flex items-center gap-2.5 rounded-2xl bg-white/[0.06] border border-white/[0.08] px-4 py-2.5 transition-all duration-200 focus-within:bg-white/[0.08] focus-within:border-white/20 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]">
+            <SearchIcon className="h-4 w-4 text-white/30 flex-shrink-0" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search posts, captions, or creators"
-              className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-500"
+              placeholder="Search posts, captions, creators…"
+              className="w-full bg-transparent text-[14px] text-white placeholder:text-white/25 outline-none caret-blue-400"
             />
-          </label>
-        </div>
-        {/* FILTERS */}
-        <div className="hide-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
-          {filters.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setFilter(item.id)}
-              className={`relative rounded-full px-3 py-2 text-sx transition-colors whitespace-nowrap ${
-                filter === item.id
-                  ? "text-black font-medium"
-                  : "text-zinc-400 hover:text-white"
-              }`}
-            >
-              {filter === item.id && (
-                <motion.div
-                  layoutId="activeFilter"
-                  className="absolute inset-0 rounded-full bg-white"
-                  transition={{ type: "spring", duration: 0.5, bounce: 0.2 }}
-                />
-              )}
-              <span className="relative z-10">{item.label}</span>
-            </button>
-          ))}
-        </div>
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="flex-shrink-0 h-5 w-5 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors text-white/60 text-[11px] font-bold"
+              >
+                ×
+              </button>
+            )}
+          </div>
 
-        {/* MEDIA FILTERS */}
-        <div className="mt-4 flex gap-6 border-t border-white/5 pt-4">
-          {[
-            { id: "all", label: "All" },
-            { id: "images", label: "Images" },
-            { id: "audio", label: "Audio" }
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setMediaFilter(item.id)}
-              className={`text-xs font-bold uppercase tracking-widest transition relative ${
-                mediaFilter === item.id ? "text-blue-400" : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              <span className="relative z-10">{item.label}</span>
-              {mediaFilter === item.id && (
-                <motion.div 
-                  layoutId="activeMediaFilter"
-                  className="absolute -bottom-1 left-0 h-[2px] w-full rounded-full bg-blue-500"
-                  transition={{ type: "spring", duration: 0.4 }}
-                />
-              )}
-            </button>
-          ))}
-        </div>
-      </section>
+          {/* Feed filter pills — animated with framer */}
+          <div className="hide-scrollbar flex gap-1.5 overflow-x-auto pb-0.5">
+            {FEED_FILTERS.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setFilter(item.id)}
+                className={`relative px-3.5 py-1.5 rounded-full text-[13px] font-semibold transition-colors duration-150 whitespace-nowrap ${
+                  filter === item.id ? "text-black" : "text-white/40 hover:text-white/70"
+                }`}
+              >
+                {filter === item.id && (
+                  <motion.div
+                    layoutId="activeFilter"
+                    className="absolute inset-0 rounded-full bg-white"
+                    transition={{ type: "spring", duration: 0.45, bounce: 0.2 }}
+                  />
+                )}
+                <span className="relative z-10">{item.label}</span>
+              </button>
+            ))}
+          </div>
 
-      {/* ✅ STORIES (FIXED) */}
+          {/* Media sub-filters */}
+          <div className="flex gap-2 pt-1 border-t border-white/[0.05]">
+            {MEDIA_FILTERS.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setMediaFilter(item.id)}
+                className={`relative px-3 py-1 rounded-full text-[12px] font-semibold transition-colors duration-150 ${
+                  mediaFilter === item.id ? "text-black" : "text-white/35 hover:text-white/60"
+                }`}
+              >
+                {mediaFilter === item.id && (
+                  <motion.div
+                    layoutId="activeMediaFilter"
+                    className="absolute inset-0 rounded-full bg-white/80"
+                    transition={{ type: "spring", duration: 0.4, bounce: 0.15 }}
+                  />
+                )}
+                <span className="relative z-10">{item.label}</span>
+              </button>
+            ))}
+          </div>
+
+        </div>
+      </div>
+
+      {/* ── STORIES ── */}
       <StoryBar stories={stories} />
 
-      {/* ERROR */}
+      {/* ── ERROR ── */}
       {error && (
-        <div className="rounded-[26px] border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-          {error}
+        <div className="mx-5 mt-4 flex items-center gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/[0.08] px-4 py-3">
+          <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-rose-400" />
+          <p className="text-[13px] text-rose-300">{error}</p>
         </div>
       )}
 
-      {/* POSTS */}
-      {loading ? (
-        <PostSkeleton count={3} />
-      ) : visiblePosts.length ? (
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={`${filter}-${mediaFilter}`}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="space-y-4"
-          >
-            {visiblePosts.slice(0, visibleCount).map((post, index) => (
-              <PostCard
-                key={post.$id}
-                post={post}
-                currentUserId={user?.$id}
-                onToggleLike={handleLikeToggle}
-                onToggleFavorite={handleFavoriteToggle}
-                onDelete={handleDelete}
-                onEdit={(id) => navigate(`/edit/${id}`)}
-                onReport={handleReport}
-                isPriority={index === 0}
-              />
-            ))}
+      {/* ── POSTS ── */}
+      <div className="px-4 py-4">
+        {loading ? (
+          <PostSkeleton count={3} />
+        ) : visiblePosts.length ? (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`${filter}-${mediaFilter}`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18 }}
+              className="space-y-3"
+            >
+              {visiblePosts.slice(0, visibleCount).map((post, index) => (
+                <PostCard
+                  key={post.$id}
+                  post={post}
+                  currentUserId={user?.$id}
+                  onToggleLike={handleLikeToggle}
+                  onToggleFavorite={handleFavoriteToggle}
+                  onDelete={handleDelete}
+                  onEdit={(id) => navigate(`/edit/${id}`)}
+                  onReport={handleReport}
+                  isPriority={index === 0}
+                />
+              ))}
 
-            {/* INFINITE SCROLL LOADER */}
-            {visibleCount < visiblePosts.length && (
-              <div ref={loaderRef} className="py-6 flex justify-center">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-500 border-t-white"></div>
-              </div>
-            )}
+              {/* Infinite scroll sentinel */}
+              {visibleCount < visiblePosts.length && (
+                <div ref={loaderRef} className="py-6 flex justify-center">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/10 border-t-white/60" />
+                </div>
+              )}
 
-            {visibleCount >= visiblePosts.length && visiblePosts.length > 5 && (
-              <p className="py-8 text-center text-xs text-zinc-500">
-                You've caught up with everything!
-              </p>
-            )}
-          </motion.div>
-        </AnimatePresence>
-      ) : (
-        <EmptyState
-          eyebrow="Feed quiet"
-          title="No posts match this vibe"
-          description="Try another search or clear filters."
-          actionLabel="Create a post"
-          actionTo={user ? "/create" : "/login"}
-        />
-      )}
+              {/* End of feed */}
+              {visibleCount >= visiblePosts.length && visiblePosts.length > 5 && (
+                <p className="py-8 text-center text-[12px] text-white/20 tracking-wide">
+                  You're all caught up ✦
+                </p>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        ) : (
+          <div className="pt-8">
+            <EmptyState
+              eyebrow="Nothing here"
+              title={search ? `No results for "${search}"` : "Feed is quiet"}
+              description={
+                search
+                  ? "Try a different keyword or clear your search."
+                  : "Adjust your filters or follow more creators."
+              }
+              actionLabel={!user ? "Sign in" : "Create a post"}
+              actionTo={!user ? "/login" : "/create"}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

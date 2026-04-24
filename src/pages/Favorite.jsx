@@ -6,12 +6,12 @@ import PostSkeleton from "../components/PostSkeleton";
 import favoriteService from "../appwrite/favorite";
 import postService from "../appwrite/post";
 import { getFileUrl, getHandle, formatCompactNumber } from "../lib/ui";
-import { 
-  HeartIcon, 
-  CommentIcon, 
-  PlayIcon, 
+import {
+  HeartIcon,
+  CommentIcon,
+  PlayIcon,
   ImageIcon,
-  SearchIcon 
+  SearchIcon,
 } from "../components/ui/Icons";
 
 const PRESET_GRADIENTS = [
@@ -26,70 +26,59 @@ const PRESET_GRADIENTS = [
 ];
 
 const getPostGradient = (id) => {
-  const index = Math.abs(id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)) % PRESET_GRADIENTS.length;
+  const index =
+    Math.abs(
+      id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    ) % PRESET_GRADIENTS.length;
   return PRESET_GRADIENTS[index];
 };
 
+const FILTERS = [
+  { id: "all",    label: "All"    },
+  { id: "images", label: "Images" },
+  { id: "audio",  label: "Audio"  },
+];
+
 export default function Favorites() {
-  const user = useSelector((state) => state.auth.userData);
+  const user     = useSelector((state) => state.auth.userData);
   const navigate = useNavigate();
-  
-  const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+  const [posts,       setPosts]       = useState([]);
+  const [loading,     setLoading]     = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [filter,      setFilter]      = useState("all");
 
   useEffect(() => {
     let active = true;
-
     async function fetchFavorites() {
-      if (!user) {
-        setPosts([]);
-        setLoading(false);
-        return;
-      }
-
+      if (!user) { setPosts([]); setLoading(false); return; }
       setLoading(true);
-
       try {
         const favoriteResponse = await favoriteService.getUSerAllFavorites(user.$id);
         const postIds = favoriteResponse?.documents?.map((item) => item.postId) || [];
-
-        if (!postIds.length) {
-          if (active) setPosts([]);
-          return;
-        }
-
-        // Fetch posts in parallel
+        if (!postIds.length) { if (active) setPosts([]); return; }
         const resolvedPosts = await Promise.all(postIds.map((id) => postService.getPostById(id)));
-        
-        if (active) {
-          setPosts(resolvedPosts.filter(Boolean));
-        }
+        if (active) setPosts(resolvedPosts.filter(Boolean));
       } catch (error) {
         console.error("Favorites load error:", error);
       } finally {
         if (active) setLoading(false);
       }
     }
-
     fetchFavorites();
     return () => (active = false);
   }, [user]);
 
-  // 🔍 LOCAL SEARCH & FILTER
   const filteredPosts = useMemo(() => {
     return posts.filter((post) => {
-      const matchesSearch = 
+      const matchesSearch =
         post.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         post.authorName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        post.tags?.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
-
-      const matchesFilter = 
-        filter === "all" || 
+        post.tags?.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesFilter =
+        filter === "all" ||
         (filter === "images" && !!post.featuredImg) ||
-        (filter === "audio" && !!post.audioId);
-
+        (filter === "audio"  && !!post.audioId);
       return matchesSearch && matchesFilter;
     });
   }, [posts, searchQuery, filter]);
@@ -107,122 +96,170 @@ export default function Favorites() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* HEADER & SEARCH */}
-      <section className="rounded-[32px] border border-white/10 bg-[#121212]/92 p-6 shadow-[0_30px_90px_rgba(0,0,0,0.34)]">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <p className="text-[10px] uppercase tracking-[0.4em] text-zinc-500 font-bold">Private Collection</p>
-            <h1 className="font-display mt-2 text-4xl text-white font-black tracking-tight">Saved</h1>
+    <div className="min-h-screen bg-[#0a0a0b] text-white">
+
+      {/* ── HEADER ── */}
+      <div className="relative overflow-hidden border-b border-white/[0.06]">
+        {/* Glow */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-16 left-8 h-48 w-48 rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(99,102,241,0.07) 0%, transparent 70%)" }}
+        />
+
+        <div className="relative px-5 pt-7 pb-5">
+          {/* Eyebrow + title */}
+          <p className="text-[11px] uppercase tracking-widest text-white/25 mb-1.5">
+            Private Collection
+          </p>
+          <div className="flex items-end justify-between gap-3">
+            <h1 className="text-[32px] font-extrabold text-white leading-none tracking-tight">
+              Saved
+            </h1>
+            {!loading && (
+              <span className="mb-0.5 text-[13px] text-white/30">
+                {filteredPosts.length}{" "}
+                {filteredPosts.length === 1 ? "post" : "posts"}
+              </span>
+            )}
           </div>
 
-          <div className="flex flex-1 max-w-md items-center gap-3 rounded-2xl border border-white/10 bg-black/40 px-4 py-3 focus-within:border-white/20 transition">
-            <SearchIcon className="h-5 w-5 text-zinc-500" />
+          {/* Search */}
+          <div className="mt-4 flex items-center gap-2.5 rounded-2xl bg-white/[0.06] border border-white/[0.08] px-4 py-2.5 transition-all duration-200 focus-within:bg-white/[0.08] focus-within:border-white/20 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]">
+            <SearchIcon className="h-4 w-4 text-white/30 flex-shrink-0" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search in saved..."
-              className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-600"
+              placeholder="Search saved posts…"
+              className="w-full bg-transparent text-[14px] text-white placeholder:text-white/25 outline-none caret-blue-400"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="flex-shrink-0 h-5 w-5 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors text-white/60 text-[11px] font-bold"
+              >
+                ×
+              </button>
+            )}
+          </div>
+
+          {/* Filter pills */}
+          <div className="mt-4 flex gap-2">
+            {FILTERS.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                className={`px-3.5 py-1.5 rounded-full text-[13px] font-semibold transition-all duration-200 ${
+                  filter === f.id
+                    ? "bg-white text-black shadow-sm"
+                    : "border border-white/[0.08] bg-white/[0.04] text-white/40 hover:text-white/70 hover:bg-white/[0.08]"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
           </div>
         </div>
+      </div>
 
-        {/* TABS */}
-        <div className="mt-8 flex gap-1 rounded-full border border-white/5 bg-black/20 p-1 w-fit">
-          {["all", "images", "audio"].map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`rounded-full px-5 py-2 text-xs font-bold capitalize transition ${
-                filter === f
-                  ? "bg-white text-black shadow-lg"
-                  : "text-zinc-500 hover:text-white"
-              }`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-      </section>
+      {/* ── GRID ── */}
+      <div className="p-1.5 sm:p-2">
+        {loading ? (
+          <div className="grid grid-cols-3 gap-1 sm:gap-1.5">
+            {[...Array(9)].map((_, i) => (
+              <div
+                key={i}
+                className="aspect-square rounded-xl bg-white/[0.05] animate-pulse"
+                style={{ animationDelay: `${i * 60}ms` }}
+              />
+            ))}
+          </div>
+        ) : filteredPosts.length ? (
+          <div className="grid grid-cols-3 gap-1 sm:gap-1.5 animate-in fade-in duration-300">
+            {filteredPosts.map((post) => {
+              const imageSrc = getFileUrl(post.featuredImg);
+              const gradient = getPostGradient(post.$id);
 
-      {/* GRID */}
-      {loading ? (
-        <div className="grid grid-cols-3 gap-1 sm:gap-2">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="aspect-square rounded-lg bg-white/5 animate-pulse" />
-          ))}
-        </div>
-      ) : filteredPosts.length ? (
-        <div className="grid grid-cols-3 gap-1 sm:gap-2">
-          {filteredPosts.map((post) => {
-            const imageSrc = getFileUrl(post.featuredImg);
-            const gradient = getPostGradient(post.$id);
-
-            return (
-              <Link
-                key={post.$id}
-                to={`/post/${post.slug}`}
-                className="group relative aspect-square overflow-hidden bg-zinc-900 transition hover:z-10"
-              >
-                {imageSrc ? (
-                  <img
-                    src={imageSrc}
-                    alt={post.title}
-                    className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
-                  />
-                ) : (
-                  <div className={`flex h-full w-full items-center justify-center p-4 bg-gradient-to-br ${gradient} relative overflow-hidden`}>
-                     {/* Subtle Background Icon */}
-                     <div className="absolute inset-0 flex items-center justify-center opacity-10 group-hover:opacity-20 transition-opacity">
-                       {post.audioId ? (
-                         <PlayIcon className="h-24 w-24 text-white" />
-                       ) : (
-                         <div className="text-[80px] font-black text-white leading-none select-none">
-                           {post.title.charAt(0).toUpperCase()}
-                         </div>
-                       )}
-                     </div>
-                    
-                    <div className="relative z-10 text-center">
-                      <h3 className="font-display text-[10px] sm:text-xs font-bold text-white leading-snug line-clamp-3 px-1">
+              return (
+                <Link
+                  key={post.$id}
+                  to={`/post/${post.slug}`}
+                  className="group relative aspect-square overflow-hidden rounded-xl bg-zinc-900 transition-transform duration-200 hover:scale-[0.98] hover:z-10"
+                >
+                  {/* Image or gradient fallback */}
+                  {imageSrc ? (
+                    <img
+                      src={imageSrc}
+                      alt={post.title}
+                      className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    />
+                  ) : (
+                    <div
+                      className={`flex h-full w-full items-center justify-center p-3 bg-gradient-to-br ${gradient} relative overflow-hidden`}
+                    >
+                      {/* Large background letter / icon */}
+                      <div className="absolute inset-0 flex items-center justify-center opacity-[0.12] group-hover:opacity-[0.18] transition-opacity select-none">
+                        {post.audioId ? (
+                          <PlayIcon className="h-20 w-20 text-white" />
+                        ) : (
+                          <span className="text-[72px] font-black text-white leading-none">
+                            {post.title.charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="relative z-10 text-center text-[10px] sm:text-[11px] font-bold text-white leading-snug line-clamp-3 drop-shadow-sm">
                         {post.title}
                       </h3>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* HOVER OVERLAY */}
-                <div className="absolute inset-0 flex items-center justify-center gap-4 bg-black/60 opacity-0 transition-opacity duration-300 group-hover:opacity-100 backdrop-blur-[2px]">
-                  <div className="flex flex-col items-center gap-1 text-white">
-                    <HeartIcon className="h-5 w-5 fill-current" />
-                    <span className="text-[10px] font-bold">{formatCompactNumber(post.likeCount || 0)}</span>
-                  </div>
-                  <div className="flex flex-col items-center gap-1 text-white">
-                    <CommentIcon className="h-5 w-5 fill-current" />
-                    <span className="text-[10px] font-bold">{formatCompactNumber(post.commentCount || 0)}</span>
-                  </div>
-                  
-                  {post.audioId && (
-                    <PlayIcon className="absolute top-2 right-2 h-3 w-3 text-white/50" />
+                  {/* Media type badge — top-right */}
+                  {(post.audioId || post.featuredImg) && (
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      {post.audioId ? (
+                        <PlayIcon className="h-3 w-3 text-white/70 drop-shadow" />
+                      ) : (
+                        <ImageIcon className="h-3 w-3 text-white/70 drop-shadow" />
+                      )}
+                    </div>
                   )}
-                  {post.featuredImg && (
-                    <ImageIcon className="absolute top-2 right-2 h-3 w-3 text-white/50" />
-                  )}
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      ) : (
-        <EmptyState
-          eyebrow="Collection"
-          title={searchQuery ? "No matches found" : "Your collection is empty"}
-          description={searchQuery ? "Try searching for something else." : "Save posts to see them here."}
-          actionLabel="Go to feed"
-          actionTo="/"
-        />
-      )}
+
+                  {/* Hover stats overlay */}
+                  <div className="absolute inset-0 flex items-end justify-start gap-3 p-3 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                    <div className="flex items-center gap-1 text-white">
+                      <HeartIcon className="h-3.5 w-3.5 fill-current" />
+                      <span className="text-[11px] font-bold">
+                        {formatCompactNumber(post.likeCount || 0)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 text-white">
+                      <CommentIcon className="h-3.5 w-3.5 fill-current" />
+                      <span className="text-[11px] font-bold">
+                        {formatCompactNumber(post.commentCount || 0)}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="pt-12 px-4">
+            <EmptyState
+              eyebrow="Collection"
+              title={searchQuery ? `No matches for "${searchQuery}"` : "Nothing saved yet"}
+              description={
+                searchQuery
+                  ? "Try a different keyword."
+                  : "Tap the bookmark on any post to save it here."
+              }
+              actionLabel="Browse posts"
+              actionTo="/"
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
