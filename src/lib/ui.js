@@ -145,7 +145,7 @@ export function buildStories(posts = [], user) {
 
 const FORBIDDEN_WORDS = [
   "fuck", "shit", "bitch", "asshole", "cunt", "dick", "pussy", "whore", "slut", "bastard",
-  "porn", "sexy", "nude", "naked", "sex", "hentai", "milf", "bra", "lingerie", "boobs", "ass"
+  "porn", "sexy", "nude", "naked", "sex", "hentai", "milf", "bra", "lingerie", "boobs", "ass", "hot"
 ];
 
 export function containsForbiddenWord(text) {
