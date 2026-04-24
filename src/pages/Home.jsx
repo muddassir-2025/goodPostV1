@@ -294,7 +294,7 @@ export default function Home() {
             <button
               key={item.id}
               onClick={() => setFilter(item.id)}
-              className={`relative rounded-full px-2 py-2 text-sm transition-colors whitespace-nowrap ${
+              className={`relative rounded-full px-3 py-2 text-sx transition-colors whitespace-nowrap ${
                 filter === item.id
                   ? "text-black font-medium"
                   : "text-zinc-400 hover:text-white"
