@@ -311,35 +311,23 @@ export default function Profile() {
                       className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
                     />
                   ) : (
-                    <div className={`flex h-full w-full flex-col justify-center p-4 bg-gradient-to-br ${gradient} relative overflow-hidden group/item`}>
-                       {/* Subtle Grid Waveform */}
-                       {post.audioId && (
-                        <div className="absolute inset-0 flex items-center justify-center gap-0.5 opacity-10 group-hover/item:opacity-30 transition-opacity">
-                          {[...Array(8)].map((_, i) => (
-                            <div 
-                              key={i} 
-                              className="w-1 bg-white rounded-full animate-waveform" 
-                              style={{ 
-                                height: `${30 + Math.random() * 40}%`,
-                                animationDelay: `${i * 0.15}s` 
-                              }} 
-                            />
-                          ))}
-                        </div>
-                      )}
+                    <div className={`flex h-full w-full items-center justify-center p-6 bg-gradient-to-br ${gradient} relative overflow-hidden group/item`}>
+                       {/* Subtle Background Icon */}
+                       <div className="absolute inset-0 flex items-center justify-center opacity-10 group-hover/item:opacity-20 transition-opacity">
+                         {post.audioId ? (
+                           <PlayIcon className="h-32 w-32 text-white" />
+                         ) : (
+                           <div className="text-[120px] font-black text-white leading-none select-none">
+                             {post.title.charAt(0).toUpperCase()}
+                           </div>
+                         )}
+                       </div>
                       
-                      <div className="relative z-10">
-                        {post.audioId && (
-                          <div className="mb-2">
-                            <PlayIcon className="h-5 w-5 text-white/80" />
-                          </div>
-                        )}
-                        <h3 className="font-display text-lg sm:text-xl md:text-2xl font-extrabold text-white leading-tight line-clamp-3">
+                      <div className="relative z-10 text-center">
+                        <h3 className="font-display text-sm sm:text-base font-bold text-white leading-snug line-clamp-4 px-2 drop-shadow-md">
                           {post.title}
                         </h3>
-                        <p className="mt-2 text-[10px] sm:text-xs text-white/70 font-medium uppercase tracking-widest">
-                          {post.audioId ? "Audio Drop" : "Story"}
-                        </p>
+                        <div className="mt-2 h-0.5 w-6 bg-white/30 mx-auto rounded-full" />
                       </div>
                     </div>
                   )}
