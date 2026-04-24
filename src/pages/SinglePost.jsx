@@ -9,6 +9,7 @@ import LikeButton from "../components/LikeButton";
 import PostSkeleton from "../components/PostSkeleton";
 import {
   ArrowLeftIcon,
+  CommentIcon,
   DotsIcon,
   EditIcon,
   ShareIcon,
