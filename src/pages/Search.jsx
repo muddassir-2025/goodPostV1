@@ -116,6 +116,7 @@ export default function Search() {
     let filtered = posts;
     const lowerQuery = debouncedQuery.toLowerCase();
 
+    // 1. If searching, return matched posts
     if (debouncedQuery) {
       filtered = posts.filter(p => {
         const text = `${p.title} ${p.content} ${p.authorName} ${p.tags?.join(" ")}`.toLowerCase();
@@ -124,9 +125,9 @@ export default function Search() {
       return rankPostsForYou(filtered);
     }
 
-    // Category filtering
+    // 2. Tab filtering logic
     if (activeCategory === "for-you") return rankPostsForYou(posts);
-    if (activeCategory === "trending") return rankPostsForYou(posts).slice(0, 10);
+    if (activeCategory === "trending") return []; // Trending shows topic list, not posts
     
     // Exact tag match for category tabs
     const tabFiltered = posts.filter(p => 
@@ -144,13 +145,15 @@ export default function Search() {
     }
   };
 
+  const isDiscoveryMode = !debouncedQuery && (activeCategory === "for-you" || activeCategory === "trending");
+
   return (
     <div className="min-h-screen bg-black text-white">
       {/* 🔍 TOP NAV (Twitter Style) */}
       <header className="sticky top-16 z-40 bg-black/80 backdrop-blur-md md:top-20">
         <div className="flex items-center gap-4 px-4 py-3">
           <div className="relative flex-1" ref={dropdownRef}>
-            <div className="flex items-center gap-3 rounded-full bg-[#202327] px-4 py-2 transition-focus-within focus-within:bg-black focus-within:ring-1 focus-within:ring-blue-500">
+            <div className="flex items-center gap-3 rounded-full bg-[#202327] px-4 py-2 transition-focus-within:bg-black transition-focus-within:ring-1 transition-focus-within:ring-blue-500">
               <SearchIcon className="h-4 w-4 text-zinc-500" />
               <input
                 type="text"
@@ -216,8 +219,41 @@ export default function Search() {
       <div className="divide-y divide-white/10">
         {loading ? (
           <div className="p-10 text-center"><PostSkeleton count={5} /></div>
-        ) : debouncedQuery ? (
-          /* SEARCH RESULTS */
+        ) : isDiscoveryMode && activeCategory === "trending" ? (
+          /* TRENDING TOPICS LIST (ONLY for Trending tab) */
+          trendingData.map((topic) => (
+            <button
+              key={topic.name}
+              onClick={() => handleSearchSelect(topic.name, "tag")}
+              className="flex w-full items-start justify-between p-4 text-left transition hover:bg-white/[0.03]"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1 text-[13px] text-zinc-500">
+                  <span>Trending</span>
+                  <span>·</span>
+                  <span>#{topic.name}</span>
+                </div>
+                <h2 className="mt-1 text-[15px] font-extrabold text-white">#{topic.name}</h2>
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="flex -space-x-2">
+                    {Array.from(topic.authors).slice(0, 3).map((auth, i) => (
+                      <div key={i} className="ring-2 ring-black rounded-full">
+                        <Avatar name={auth} size="xs" />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[13px] text-zinc-500">
+                    {topic.count > 1000 ? `${(topic.count / 1000).toFixed(1)}K` : topic.count} posts
+                  </p>
+                </div>
+              </div>
+              <button className="text-zinc-600">
+                <DotsIcon className="h-5 w-5" />
+              </button>
+            </button>
+          ))
+        ) : results.length > 0 ? (
+          /* POST LIST (For all tags and For You) */
           results.map((post) => (
             <button
               key={post.$id}
@@ -239,66 +275,27 @@ export default function Search() {
                 </div>
               </div>
               {post.featuredImg && (
-                <div className="h-20 w-20 overflow-hidden rounded-xl border border-white/10">
+                <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl border border-white/10">
                   <img src={getFileUrl(post.featuredImg)} className="h-full w-full object-cover" />
                 </div>
               )}
             </button>
           ))
         ) : (
-          /* TRENDING TOPICS VIEW (Twitter style) */
-          trendingData.map((topic, idx) => (
-            <button
-              key={topic.name}
-              onClick={() => handleSearchSelect(topic.name, "tag")}
-              className="flex w-full items-start justify-between p-4 text-left transition hover:bg-white/[0.03]"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1 text-[13px] text-zinc-500">
-                  <span>Trending in {activeCategory === "for-you" ? "your area" : activeCategory}</span>
-                  <span>·</span>
-                  <span>Trending</span>
-                </div>
-                <h2 className="mt-1 text-[15px] font-extrabold text-white">#{topic.name}</h2>
-                <div className="mt-2 flex items-center gap-2">
-                  <div className="flex -space-x-2">
-                    {Array.from(topic.authors).slice(0, 3).map((auth, i) => (
-                      <div key={i} className="ring-2 ring-black rounded-full">
-                        <Avatar name={auth} size="xs" />
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-[13px] text-zinc-500">
-                    {topic.count > 1000 ? `${(topic.count / 1000).toFixed(1)}K` : topic.count} posts
-                  </p>
-                </div>
-                {topic.latestPost && (
-                  <p className="mt-2 line-clamp-1 text-[14px] text-zinc-400 font-medium italic">
-                    "{topic.latestPost.title}"
-                  </p>
-                )}
-              </div>
-              <button className="text-zinc-600 hover:text-blue-500 transition">
-                <DotsIcon className="h-5 w-5" />
-              </button>
-            </button>
-          ))
+          /* EMPTY STATE */
+          <div className="p-10 text-center animate-in fade-in duration-700">
+            <EmptyState 
+              title={debouncedQuery ? "No search results" : `No posts in ${activeCategory}`}
+              description={debouncedQuery ? "Try different keywords" : "Browse other categories or share your own!"}
+              actionLabel="Browse For You"
+              onClickAction={() => {
+                setQuery("");
+                setActiveCategory("for-you");
+              }}
+            />
+          </div>
         )}
       </div>
-
-      {results.length === 0 && !loading && (
-        <div className="p-10 text-center animate-in fade-in duration-700">
-          <EmptyState 
-            title={debouncedQuery ? "No search results" : `No posts in ${activeCategory}`}
-            description={debouncedQuery ? "Try different keywords" : "Be the first to share something in this category!"}
-            actionLabel="Browse For You"
-            onClickAction={() => {
-              setQuery("");
-              setActiveCategory("for-you");
-            }}
-          />
-        </div>
-      )}
     </div>
   );
 }
