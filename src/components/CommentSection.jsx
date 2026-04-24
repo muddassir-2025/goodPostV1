@@ -24,14 +24,12 @@ export default function CommentSection({
 
   return (
     <div className="mt-8 mb-12">
-      {/* Header - Tightened */}
       <div className="mb-6 flex items-center gap-4">
         <h3 className="text-lg font-bold text-white">
           {comments.length} Comments
         </h3>
       </div>
 
-      {/* Primary Input - Simplified & Tightened */}
       <div className="flex gap-3 mb-8">
         <Avatar name="User" size="sm" />
         <div className="flex-1">
@@ -50,7 +48,6 @@ export default function CommentSection({
         </div>
       </div>
 
-      {/* List - Minimal Spacing */}
       <div className="space-y-6">
         {sortedComments.length > 0 ? (
           sortedComments.map((comment) => (
@@ -88,10 +85,11 @@ export default function CommentSection({
                   </p>
                 )}
 
+                {/* MOBILE FRIENDLY ACTIONS (Always visible or visible on hover) */}
                 {(currentUserId === comment.userId || isAdmin) && !editingId && (
-                  <div className="flex gap-4 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => onEditStart(comment)} className="text-[11px] font-bold text-zinc-500 hover:text-zinc-300">Edit</button>
-                    <button onClick={() => onDelete(comment.$id)} className="text-[11px] font-bold text-zinc-500 hover:text-rose-400">Delete</button>
+                  <div className="flex gap-4 mt-1.5 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => onEditStart(comment)} className="text-[11px] font-bold text-zinc-500 hover:text-zinc-300 active:text-white">Edit</button>
+                    <button onClick={() => onDelete(comment.$id)} className="text-[11px] font-bold text-zinc-500 hover:text-rose-400 active:text-rose-500">Delete</button>
                   </div>
                 )}
               </div>
