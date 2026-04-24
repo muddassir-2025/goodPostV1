@@ -9,6 +9,7 @@ import EmptyState from "../components/EmptyState";
 import { fetchFeedPosts, sortPosts } from "../lib/posts";
 import { syncFavorite, syncLike } from "../lib/engagement";
 import postService from "../appwrite/post";
+import { confirm, toast } from "../confirmService";
 
 export default function TagFeed() {
   const { tag } = useParams();
@@ -143,6 +144,31 @@ export default function TagFeed() {
     }
   };
 
+  const handleReport = async (postId) => {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    const ok = await confirm("Report this post? If 5 users report it, it will be automatically removed.");
+    if (!ok) return;
+
+    try {
+      const res = await postService.reportPost(postId, user.$id);
+      
+      if (res.status === "deleted") {
+        setPosts(prev => prev.filter(p => p.$id !== postId));
+        toast("Post removed after multiple reports.", "warning");
+      } else if (res.status === "already_reported") {
+        toast("Already reported.", "info");
+      } else {
+        toast("Report submitted.", "success");
+      }
+    } catch (err) {
+      console.error("Report failed:", err);
+    }
+  };
+
   const visiblePosts = sortPosts(posts, filter);
 
   return (
@@ -196,6 +222,7 @@ export default function TagFeed() {
               onToggleLike={handleToggleLike}
               onToggleFavorite={handleToggleFavorite}
               onDelete={handleDelete}
+              onReport={handleReport}
             />
           ))}
         </div>

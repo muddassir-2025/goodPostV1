@@ -85,12 +85,12 @@ export default function Notifications() {
             Icon = HeartIcon;
             color = "text-rose-500";
             actionText = "liked your post.";
-            link = `/post/${notif.postId}`; // Assuming postId works or can find the slug
+            link = `/post/${notif.postSlug || notif.postId}`;
           } else if (notif.type === "comment") {
             Icon = CommentIcon;
             color = "text-blue-400";
             actionText = "commented on your post.";
-            link = `/post/${notif.postId}`;
+            link = `/post/${notif.postSlug || notif.postId}?scroll=comments`;
           } else if (notif.type === "follow") {
             Icon = UserIcon;
             color = "text-green-400";
@@ -114,10 +114,22 @@ export default function Notifications() {
               </div>
 
               <div className="flex-1">
-                <p className="text-sm text-zinc-300">
-                  <span className="font-semibold text-white">Someone</span> {actionText}
+                <p className="text-sm text-zinc-300 leading-relaxed">
+                  <span className="font-semibold text-white">
+                    {notif.actorName || "Someone"}
+                  </span>{" "}
+                  {actionText}
                 </p>
-                <p className="mt-1 text-xs text-zinc-500">
+
+                {notif.type === "comment" && notif.content && (
+                  <div className="mt-2 rounded-2xl border border-white/5 bg-white/5 p-3">
+                    <p className="line-clamp-2 text-xs text-zinc-400 italic">
+                      "{notif.content}"
+                    </p>
+                  </div>
+                )}
+
+                <p className="mt-2 text-[10px] text-zinc-500 uppercase tracking-wider">
                   {formatRelativeTime(notif.$createdAt)}
                 </p>
               </div>

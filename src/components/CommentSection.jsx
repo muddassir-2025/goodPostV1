@@ -1,4 +1,5 @@
 import Avatar from "./Avatar";
+import { useSelector } from "react-redux";
 import { formatRelativeTime, getHandle } from "../lib/ui";
 
 export default function CommentSection({
@@ -15,6 +16,8 @@ export default function CommentSection({
   onEditCancel,
   onDelete,
 }) {
+  const isAdmin = useSelector((state) => state.auth.isAdmin);
+
   return (
     <section className="rounded-[30px] border border-white/10 bg-[#121212]/92 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -62,7 +65,7 @@ export default function CommentSection({
                       </p>
                     </div>
 
-                    {currentUserId === comment.userId ? (
+                    {currentUserId === comment.userId || isAdmin ? (
                       <div className="flex items-center gap-2 text-xs">
                         <button
                           type="button"

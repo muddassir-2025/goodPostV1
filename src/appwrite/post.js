@@ -50,6 +50,9 @@ class PostService {
         commentCount: 0,
 
         isSystem,
+
+        reportCount: 0,
+        reportedBy: [],
       }
     );
   } catch (error) {
@@ -189,24 +192,55 @@ class PostService {
   }
 
   // ✅ Upload Audio
-async uploadAudio(file, userId) {
-  try {
-    return await this.storage.createFile(
-      import.meta.env.VITE_APPWRITE_BUCKET_ID,
-      ID.unique(),
-      file,
-      [
-        `read("any")`,
-        `update("user:${userId}")`,
-        `delete("user:${userId}")`
-      ]
-    );
-  } catch (error) {
-    console.log("upload audio error:", error);
+  async uploadAudio(file, userId) {
+    try {
+      return await this.storage.createFile(
+        import.meta.env.VITE_APPWRITE_BUCKET_ID,
+        ID.unique(),
+        file,
+        [
+          `read("any")`,
+          `update("user:${userId}")`,
+          `delete("user:${userId}")`
+        ]
+      );
+    } catch (error) {
+      console.log("upload audio error:", error);
+    }
   }
-}
 
+  // ✅ Report Post
+  async reportPost(postId, userId) {
+    try {
+      const post = await this.getPostById(postId);
+      if (!post) return;
 
+      const reportedBy = post.reportedBy || [];
+      if (reportedBy.includes(userId)) return { status: "already_reported" };
+
+      const newReportedBy = [...reportedBy, userId];
+      const newReportCount = newReportedBy.length;
+
+      if (newReportCount >= 5) {
+        // ✅ AUTO-DELETE IF 5 REPORTS
+        await this.deletePost(postId);
+        if (post.featuredImg) await this.deleteFile(post.featuredImg);
+        if (post.audioId) await this.deleteFile(post.audioId);
+        return { status: "deleted" };
+      }
+
+      // ✅ UPDATE REPORT COUNT
+      await this.updatePost(postId, {
+        reportCount: newReportCount,
+        reportedBy: newReportedBy,
+      });
+
+      return { status: "reported" };
+    } catch (error) {
+      console.log("reportPost error:", error);
+      throw error;
+    }
+  }
 }
 
 

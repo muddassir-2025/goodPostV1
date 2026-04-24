@@ -1,7 +1,7 @@
 import favoriteService from "../appwrite/favorite";
 import likeService from "../appwrite/like";
 
-export async function syncLike({ postId, userId, currentlyLiked }) {
+export async function syncLike({ postId, userId, userName, currentlyLiked }) {
   if (currentlyLiked) {
     const existing = await likeService.getUserLike(postId, userId);
     const likeId = existing?.documents?.[0]?.$id;
@@ -13,7 +13,7 @@ export async function syncLike({ postId, userId, currentlyLiked }) {
     return { liked: false };
   }
 
-  await likeService.createLike({ postId, userId });
+  await likeService.createLike({ postId, userId, userName });
   return { liked: true };
 }
 

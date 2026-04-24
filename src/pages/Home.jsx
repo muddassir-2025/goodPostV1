@@ -9,6 +9,7 @@ import { SearchIcon } from "../components/ui/Icons";
 import postService from "../appwrite/post";
 import followService from "../appwrite/follow"; // ✅ NEW
 import { syncFavorite, syncLike } from "../lib/engagement";
+import { confirm, toast } from "../confirmService";
 import { fetchFeedPosts, filterPosts, sortPosts } from "../lib/posts";
 import { buildStories } from "../lib/ui";
 
@@ -141,6 +142,7 @@ export default function Home() {
       await syncLike({
         postId: post.$id,
         userId: user.$id,
+        userName: user.name,
         currentlyLiked: post.liked,
       });
     } catch {
@@ -205,6 +207,31 @@ export default function Home() {
       );
     } catch {
       setError("Delete failed. Please try again.");
+    }
+  }
+
+  async function handleReport(postId) {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    const ok = await confirm("Report this post for inappropriate content? If 5 users report it, it will be automatically removed.");
+    if (!ok) return;
+
+    try {
+      const res = await postService.reportPost(postId, user.$id);
+      
+      if (res.status === "deleted") {
+        setPosts(prev => prev.filter(p => p.$id !== postId));
+        toast("Post removed after multiple reports.", "warning");
+      } else if (res.status === "already_reported") {
+        toast("You have already reported this post.", "info");
+      } else {
+        toast("Report submitted successfully.", "success");
+      }
+    } catch {
+      setError("Report failed. Please try again.");
     }
   }
 
@@ -294,6 +321,7 @@ export default function Home() {
               onToggleFavorite={handleFavoriteToggle}
               onDelete={handleDelete}
               onEdit={(id) => navigate(`/edit/${id}`)}
+              onReport={handleReport}
             />
           ))}
 

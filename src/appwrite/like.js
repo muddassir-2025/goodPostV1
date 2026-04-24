@@ -13,7 +13,7 @@ class LikeService {
         this.databases = new Databases(this.client);
     }
 
-    async createLike({ postId, userId }) {
+    async createLike({ postId, userId, userName }) {
         try {
             const res = await this.databases.createDocument(
                 import.meta.env.VITE_APPWRITE_DATABASE_ID,
@@ -36,8 +36,10 @@ class LikeService {
                         notificationService.createNotification({
                             userId: post.authorID,
                             actorId: userId,
+                            actorName: userName,
                             type: "like",
                             postId: postId,
+                            postSlug: post.slug,
                         });
                     });
                 }

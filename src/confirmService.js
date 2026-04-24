@@ -1,5 +1,5 @@
 import { store } from "./App/store";
-import { showConfirm, hideConfirm } from "./features/error/confirmSlice";
+import { showConfirm, hideConfirm, showToast, hideToast } from "./features/error/confirmSlice";
 
 let resolver = null;
 
@@ -15,6 +15,13 @@ export function confirmYes() {
   resolver?.(true);
   resolver = null;
   store.dispatch(hideConfirm());
+}
+
+export function toast(message, type = "info") {
+  store.dispatch(showToast({ message, type }));
+  setTimeout(() => {
+    store.dispatch(hideToast());
+  }, 3000);
 }
 
 export function confirmNo() {

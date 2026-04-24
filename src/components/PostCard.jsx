@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import Avatar from "./Avatar";
 import FavoriteButton from "./FavoriteButton";
@@ -11,6 +12,7 @@ import {
   DotsIcon,
   EditIcon,
   ShareIcon,
+  ShieldIcon,
   TrashIcon,
 } from "./ui/Icons";
 import {
@@ -27,12 +29,14 @@ export default function PostCard({
   onToggleFavorite,
   onDelete,
   onEdit,
+  onReport,
 }) {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [shareLabel, setShareLabel] = useState("Share");
 
-  const isOwner = currentUserId && currentUserId === post.authorID;
+  const isAdmin = useSelector((state) => state.auth.isAdmin);
+  const isOwner = (currentUserId && currentUserId === post.authorID) || isAdmin;
   const imageSrc = getFileUrl(post.featuredImg);
   const audioSrc = getFileUrl(post.audioId);
   const captionPreview =
@@ -96,6 +100,25 @@ export default function PostCard({
               >
                 <CommentIcon className="h-4 w-4" />
                 View post
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onReport(post.$id);
+                }}
+                className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm text-amber-300 transition hover:bg-amber-500/10"
+              >
+                <div className="flex items-center gap-2">
+                  <ShieldIcon className="h-4 w-4" />
+                  Report
+                </div>
+                {post.reportCount > 0 && (
+                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-md bg-amber-500/20 px-1 text-[10px] font-bold">
+                    {post.reportCount}
+                  </span>
+                )}
               </button>
 
               {isOwner ? (

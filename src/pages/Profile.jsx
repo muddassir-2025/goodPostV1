@@ -69,7 +69,7 @@ export default function Profile() {
         setIsFollowing(false);
         setFollowersCount((prev) => Math.max(0, prev - 1));
       } else {
-        await followService.followUser(currentUser.$id, targetUserId);
+        await followService.followUser(currentUser.$id, targetUserId, currentUser.name);
         setIsFollowing(true);
         setFollowersCount((prev) => prev + 1);
       }

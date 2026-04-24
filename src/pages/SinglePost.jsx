@@ -25,6 +25,7 @@ import { confirm } from "../confirmService";
 export default function SinglePost() {
   const { slug } = useParams();
   const user = useSelector((state) => state.auth.userData);
+  const isAdmin = useSelector((state) => state.auth.isAdmin);
   const navigate = useNavigate();
   const commentsRef = useRef(null);
 
@@ -88,7 +89,16 @@ export default function SinglePost() {
       }
     }
 
-    loadPost();
+    loadPost().then(() => {
+      // ✅ SCROLL TO COMMENTS IF LINKED
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("scroll") === "comments") {
+        setTimeout(() => {
+          commentsRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 800);
+      }
+    });
+
     return () => {
       active = false;
     };
@@ -110,7 +120,7 @@ export default function SinglePost() {
     );
   }
 
-  const isOwner = user?.$id === post.authorID;
+  const isOwner = (user?.$id === post.authorID) || isAdmin;
   const imageSrc = getFileUrl(post.featuredImg);
   const audioSrc = getFileUrl(post.audioId);
 
@@ -133,6 +143,7 @@ export default function SinglePost() {
       await syncLike({
         postId: post.$id,
         userId: user.$id,
+        userName: user.name,
         currentlyLiked: previous.liked,
       });
     } catch {

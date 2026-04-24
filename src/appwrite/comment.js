@@ -47,8 +47,11 @@ class CommentService {
                 notificationService.createNotification({
                     userId: post.authorID,
                     actorId: userId,
+                    actorName: userName,
                     type: "comment",
                     postId: postId,
+                    postSlug: post.slug,
+                    content: content,
                 });
             });
         }

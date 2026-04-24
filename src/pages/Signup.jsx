@@ -35,7 +35,8 @@ export default function Signup() {
         const user = await authService.getCurrentUser();
 
         if (user) {
-          dispatch(login(user));
+          const isAdmin = await authService.checkIsAdmin();
+          dispatch(login({ userData: user, isAdmin }));
         }
       }
     } catch {

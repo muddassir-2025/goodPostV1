@@ -5,6 +5,11 @@ const confirmSlice = createSlice({
   initialState: {
     open: false,
     message: "",
+    toast: {
+      open: false,
+      message: "",
+      type: "info",
+    },
   },
   reducers: {
     showConfirm: (state, action) => {
@@ -15,8 +20,17 @@ const confirmSlice = createSlice({
       state.open = false;
       state.message = "";
     },
+    showToast: (state, action) => {
+      state.toast.open = true;
+      state.toast.message = action.payload.message;
+      state.toast.type = action.payload.type || "info";
+    },
+    hideToast: (state) => {
+      state.toast.open = false;
+      state.toast.message = "";
+    },
   },
 });
 
-export const { showConfirm, hideConfirm } = confirmSlice.actions;
+export const { showConfirm, hideConfirm, showToast, hideToast } = confirmSlice.actions;
 export default confirmSlice.reducer;

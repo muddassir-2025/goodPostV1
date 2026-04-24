@@ -19,6 +19,7 @@ import Signup from "./pages/Signup";
 import SinglePost from "./pages/SinglePost";
 import TagFeed from "./pages/TagFeed";
 import ConfirmPopup from "./components/ConfirmPopup";
+import Toast from "./components/Toast";
 
 import Notifications from "./pages/Notifications";
 
@@ -27,9 +28,10 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    authService.getCurrentUser().then((user) => {
+    authService.getCurrentUser().then(async (user) => {
       if (user) {
-        dispatch(login(user));
+        const isAdmin = await authService.checkIsAdmin();
+        dispatch(login({ userData: user, isAdmin }));
       } else {
         dispatch(logout());
       }
@@ -54,6 +56,7 @@ function App() {
 
       {/* ✅ GLOBAL POPUP (must be here) */}
     <ConfirmPopup />
+    <Toast />
 
       <Routes>
         <Route path="/login" element={<Login />} />

@@ -23,7 +23,7 @@ class FollowService {
 
 
 
-async followUser(followerId, followingId) {
+async followUser(followerId, followingId, followerName) {
   const existing = await this.isFollowing(followerId, followingId);
   if (existing) return null;
 
@@ -46,6 +46,7 @@ async followUser(followerId, followingId) {
     notificationService.createNotification({
       userId: followingId,
       actorId: followerId,
+      actorName: followerName,
       type: "follow",
     });
   });

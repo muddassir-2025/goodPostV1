@@ -1,8 +1,9 @@
-import { Client, ID, Account } from "appwrite";
+import { Client, ID, Account, Teams } from "appwrite";
 
 class Authservice {
   client = new Client();
   account;
+  teams;
 
   constructor() {
     this.client
@@ -10,6 +11,24 @@ class Authservice {
       .setProject(import.meta.env.VITE_APPWRITE_PROJECT_ID);
 
     this.account = new Account(this.client);
+    this.teams = new Teams(this.client);
+  }
+
+  /**
+   * Check if the current user belongs to the 'admins' team.
+   */
+  async checkIsAdmin() {
+    try {
+      const response = await this.teams.list();
+      // Returns true if user is in a team named 'admins' or with ID 'admins'
+      return response.teams.some(
+        (team) => 
+          team.name.toLowerCase() === "admins" || 
+          team.$id === "admins"
+      );
+    } catch (error) {
+      return false;
+    }
   }
 
   // 🔐 Signup

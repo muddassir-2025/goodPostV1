@@ -4,8 +4,10 @@ import Avatar from "./Avatar";
 import LogoutBtn from "./LogoutBtn";
 import { HeartIcon, MessageIcon, PlusSquareIcon, BellIcon } from "./ui/Icons";
 import { getHandle } from "../lib/ui";
+import notificationService from "../appwrite/notification";
+import { useEffect, useState } from "react";
 
-function ActionLink({ to, label, icon }) {
+function ActionLink({ to, label, icon, badge = 0 }) {
   const Icon = icon;
 
   return (
@@ -13,20 +15,43 @@ function ActionLink({ to, label, icon }) {
       to={to}
       aria-label={label}
       className={({ isActive }) =>
-        `flex h-11 w-11 items-center justify-center rounded-full border transition ${
+        `flex h-11 w-11 items-center justify-center rounded-full border transition relative ${
           isActive
             ? "border-white/20 bg-zinc-100 !text-zinc-950"
             : "border-white/10 bg-white/5 text-zinc-300 hover:border-white/20 hover:text-white"
         }`
       }
     >
-      {({ isActive }) => <Icon className="h-5 w-5" filled={isActive} />}
+      {({ isActive }) => (
+        <>
+          <Icon className="h-5 w-5" filled={isActive} />
+          {badge > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white ring-2 ring-black">
+              {badge > 9 ? "9+" : badge}
+            </span>
+          )}
+        </>
+      )}
     </NavLink>
   );
 }
 
 export default function Navbar() {
   const user = useSelector((state) => state.auth.userData);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+
+    async function checkNotifications() {
+      const count = await notificationService.countUnread(user.$id);
+      setUnreadCount(count);
+    }
+
+    checkNotifications();
+    const interval = setInterval(checkNotifications, 30000); // Check every 30s
+    return () => clearInterval(interval);
+  }, [user]);
 
   return (
     <header className="fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-black/72 backdrop-blur-xl">
@@ -49,7 +74,7 @@ export default function Navbar() {
           <div className="flex items-center gap-2 sm:gap-3">
             <ActionLink to="/create" label="Create post" icon={PlusSquareIcon} />
             <ActionLink to="/favorites" label="Favorites" icon={HeartIcon} />
-            <ActionLink to="/notifications" label="Notifications" icon={BellIcon} />
+            <ActionLink to="/notifications" label="Notifications" icon={BellIcon} badge={unreadCount} />
             <ActionLink to="/messages" label="Messages" icon={MessageIcon} />
 
             <Link

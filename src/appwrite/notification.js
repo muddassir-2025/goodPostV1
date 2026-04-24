@@ -20,10 +20,13 @@ class NotificationService {
     return import.meta.env.VITE_APPWRITE_NOTIFICATIONS_ID || "notifications";
   }
 
-  async createNotification({ userId, actorId, type, postId = null }) {
+  async createNotification({ userId, actorId, actorName, type, postId = null, postSlug = null, content = null }) {
     if (userId === actorId) return null; // Don't notify yourself
 
     try {
+      // ✅ CLEANUP OLD NOTIFICATIONS (Limit to 15)
+      this.deleteOldNotifications(userId);
+
       return await this.databases.createDocument(
         this.databaseId,
         this.notificationsCollectionId,
@@ -31,17 +34,48 @@ class NotificationService {
         {
           userId,
           actorId,
+          actorName,
           type,
           postId,
+          postSlug,
+          content,
           isRead: false,
         },
         [
-          Permission.read(Role.user(userId)),
-          Permission.delete(Role.user(userId)),
+          Permission.read(Role.any()), 
+          Permission.write(Role.user(actorId)),
         ]
       );
     } catch (error) {
       console.error("Create notification error:", error);
+    }
+  }
+
+  async deleteOldNotifications(userId) {
+    try {
+      const res = await this.databases.listDocuments(
+        this.databaseId,
+        this.notificationsCollectionId,
+        [
+          Query.equal("userId", userId),
+          Query.orderDesc("$createdAt"),
+          Query.offset(15), // Get everything after the first 15
+        ]
+      );
+
+      if (res.documents.length > 0) {
+        await Promise.all(
+          res.documents.map((doc) =>
+            this.databases.deleteDocument(
+              this.databaseId,
+              this.notificationsCollectionId,
+              doc.$id
+            )
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Cleanup error:", error);
     }
   }
 
@@ -57,8 +91,30 @@ class NotificationService {
         ]
       );
     } catch (error) {
-      console.error("Get notifications error:", error);
+      // Don't log "not authorized" repeatedly to avoid console spam
+      if (error?.code !== 401) {
+        console.error("Get notifications error:", error);
+      }
       return { documents: [] };
+    }
+  }
+
+  async countUnread(userId) {
+    try {
+      const res = await this.databases.listDocuments(
+        this.databaseId,
+        this.notificationsCollectionId,
+        [
+          Query.equal("userId", userId),
+          Query.equal("isRead", false),
+          Query.limit(1),
+        ]
+      );
+      return res?.total || 0;
+    } catch (error) {
+      // If permissions are not set in Appwrite console, this will fail
+      // We catch it silently to prevent console spam
+      return 0;
     }
   }
 
