@@ -30,6 +30,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("discovery");
+  const [mediaFilter, setMediaFilter] = useState("all"); // all, images, audio
 
   // ✅ INFINITE SCROLL STATE
   const [visibleCount, setVisibleCount] = useState(5);
@@ -93,7 +94,14 @@ export default function Home() {
   const feedFiltered = filter === "following" 
     ? searchFiltered.filter((p) => allowedUsers.has(p.authorID) && p.authorID !== user?.$id)
     : searchFiltered;
-  const visiblePosts = sortPosts(feedFiltered, filter === "following" ? "latest" : filter);
+
+  const mediaFiltered = feedFiltered.filter(p => {
+    if (mediaFilter === "images") return !!p.featuredImg;
+    if (mediaFilter === "audio") return !!p.audioId;
+    return true;
+  });
+
+  const visiblePosts = sortPosts(mediaFiltered, filter === "following" ? "latest" : filter);
 
   // ✅ INFINITE SCROLL OBSERVER
   useEffect(() => {
@@ -278,20 +286,41 @@ export default function Home() {
             />
           </label>
         </div>
-
         {/* FILTERS */}
         <div className="hide-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
           {filters.map((item) => (
             <button
               key={item.id}
               onClick={() => setFilter(item.id)}
-              className={`rounded-full px-4 py-2 text-sm ${
+              className={`rounded-full px-4 py-2 text-sm transition ${
                 filter === item.id
                   ? "bg-white text-black"
                   : "border border-white/10 bg-white/5 text-zinc-400 hover:text-white"
               }`}
             >
               {item.label}
+            </button>
+          ))}
+        </div>
+
+        {/* MEDIA FILTERS */}
+        <div className="mt-4 flex gap-6 border-t border-white/5 pt-4">
+          {[
+            { id: "all", label: "All" },
+            { id: "images", label: "Images" },
+            { id: "audio", label: "Audio" }
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setMediaFilter(item.id)}
+              className={`text-xs font-bold uppercase tracking-widest transition relative ${
+                mediaFilter === item.id ? "text-blue-400" : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              {item.label}
+              {mediaFilter === item.id && (
+                <div className="absolute -bottom-1 left-0 h-[2px] w-full rounded-full bg-blue-500 animate-in fade-in zoom-in duration-300" />
+              )}
             </button>
           ))}
         </div>

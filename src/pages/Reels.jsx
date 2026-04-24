@@ -16,6 +16,7 @@ export default function Feed() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [mediaFilter, setMediaFilter] = useState("all"); // all, images, audio
 
   useEffect(() => {
     let active = true;
@@ -166,6 +167,28 @@ export default function Feed() {
         <p className="mt-2 text-sm leading-6 text-zinc-400">
           See posts only from creators you already follow.
         </p>
+
+        {/* MEDIA FILTERS */}
+        <div className="mt-6 flex gap-6 border-t border-white/5 pt-4">
+          {[
+            { id: "all", label: "All" },
+            { id: "images", label: "Images" },
+            { id: "audio", label: "Audio" }
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setMediaFilter(item.id)}
+              className={`text-xs font-bold uppercase tracking-widest transition relative ${
+                mediaFilter === item.id ? "text-blue-400" : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              {item.label}
+              {mediaFilter === item.id && (
+                <div className="absolute -bottom-1 left-0 h-[2px] w-full rounded-full bg-blue-500 animate-in fade-in zoom-in duration-300" />
+              )}
+            </button>
+          ))}
+        </div>
       </section>
 
       {error ? (
@@ -176,28 +199,40 @@ export default function Feed() {
 
       {loading ? (
         <PostSkeleton count={2} />
-      ) : posts.length ? (
-        <div className="space-y-4">
-          {posts.map((post) => (
-            <PostCard
-              key={post.$id}
-              post={post}
-              currentUserId={user?.$id}
-              onToggleLike={handleLikeToggle}
-              onToggleFavorite={handleFavoriteToggle}
-              onDelete={handleDelete}
-              onEdit={(postId) => navigate(`/edit/${postId}`)}
-            />
-          ))}
-        </div>
       ) : (
-        <EmptyState
-          eyebrow="Feed"
-          title="No followed posts yet"
-          description="Follow more people to build your personal feed."
-          actionLabel="Discover posts"
-          actionTo="/"
-        />
+        <div className="space-y-4">
+          {posts
+            .filter((p) => {
+              if (mediaFilter === "images") return !!p.featuredImg;
+              if (mediaFilter === "audio") return !!p.audioId;
+              return true;
+            })
+            .map((post) => (
+              <PostCard
+                key={post.$id}
+                post={post}
+                currentUserId={user?.$id}
+                onToggleLike={handleLikeToggle}
+                onToggleFavorite={handleFavoriteToggle}
+                onDelete={handleDelete}
+                onEdit={(postId) => navigate(`/edit/${postId}`)}
+              />
+            ))}
+            
+          {posts.filter((p) => {
+            if (mediaFilter === "images") return !!p.featuredImg;
+            if (mediaFilter === "audio") return !!p.audioId;
+            return true;
+          }).length === 0 && (
+            <EmptyState
+              eyebrow="Feed"
+              title={`No ${mediaFilter} found`}
+              description={`None of the people you follow have posted ${mediaFilter === 'all' ? 'anything' : mediaFilter} yet.`}
+              actionLabel="Discover more"
+              actionTo="/"
+            />
+          )}
+        </div>
       )}
     </div>
   );
