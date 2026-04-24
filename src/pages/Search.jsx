@@ -25,11 +25,12 @@ import { getFileUrl, getHandle, formatRelativeTime } from "../lib/ui";
 const CATEGORIES = [
   { id: "for-you", label: "For You" },
   { id: "trending", label: "Trending" },
-  { id: "islamic", label: "Islamic" },
-  { id: "news", label: "News" },
+  { id: "Islamic", label: "Islamic" },
+  { id: "Quran", label: "Quran" },
   { id: "memes", label: "Memes" },
-  { id: "sports", label: "Sports" },
-  { id: "tech", label: "Tech" },
+  { id: "Nasheed", label: "Nasheed" },
+  { id: "art", label: "Art" },
+  { id: "Quote", label: "Quotes" },
 ];
 
 export default function Search() {
@@ -127,7 +128,12 @@ export default function Search() {
     if (activeCategory === "for-you") return rankPostsForYou(posts);
     if (activeCategory === "trending") return rankPostsForYou(posts).slice(0, 10);
     
-    return posts.filter(p => p.tags?.some(t => t.toLowerCase() === activeCategory));
+    // Exact tag match for category tabs
+    const tabFiltered = posts.filter(p => 
+      p.tags?.some(t => t.toLowerCase() === activeCategory.toLowerCase())
+    );
+    
+    return rankPostsForYou(tabFiltered);
   }, [posts, debouncedQuery, activeCategory]);
 
   const handleSearchSelect = (val, type = "query") => {
@@ -281,8 +287,16 @@ export default function Search() {
       </div>
 
       {results.length === 0 && !loading && (
-        <div className="p-10 text-center">
-          <EmptyState title="No results found" description="Try searching for something else" />
+        <div className="p-10 text-center animate-in fade-in duration-700">
+          <EmptyState 
+            title={debouncedQuery ? "No search results" : `No posts in ${activeCategory}`}
+            description={debouncedQuery ? "Try different keywords" : "Be the first to share something in this category!"}
+            actionLabel="Browse For You"
+            onClickAction={() => {
+              setQuery("");
+              setActiveCategory("for-you");
+            }}
+          />
         </div>
       )}
     </div>
