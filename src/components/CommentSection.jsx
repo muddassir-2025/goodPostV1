@@ -22,14 +22,38 @@ export default function CommentSection({
   const [replyValue, setReplyValue] = useState("");
   const [expandedReplies, setExpandedReplies] = useState({});
 
+  // 🌳 BUILD FLAT-NESTED TREE (YouTube Style: Only 1 level of nesting)
   const commentTree = useMemo(() => {
     const map = {};
     const roots = [];
+    
+    // First, pass: collect all comments
     comments.forEach(c => map[c.$id] = { ...c, replies: [] });
+    
+    // Second, pass: assign replies to their parent's root (flattening)
     comments.forEach(c => {
-      if (c.parentId && map[c.parentId]) map[c.parentId].replies.push(map[c.$id]);
-      else roots.push(map[c.$id]);
+      if (c.parentId) {
+        // Find the absolute root parent to avoid "triangle" staircase
+        let currentParentId = c.parentId;
+        let rootParent = map[currentParentId];
+        
+        // If the parent is itself a reply, find its parent until we hit a root
+        while (rootParent && rootParent.parentId) {
+           rootParent = map[rootParent.parentId];
+        }
+
+        if (rootParent) {
+          rootParent.replies.push(map[c.$id]);
+        } else if (map[c.parentId]) {
+          // Fallback if root finding fails
+          map[c.parentId].replies.push(map[c.$id]);
+        }
+      } else {
+        roots.push(map[c.$id]);
+      }
     });
+
+    // Sort roots by latest
     return roots.sort((a, b) => new Date(b.$createdAt) - new Date(a.$createdAt));
   }, [comments]);
 
@@ -54,14 +78,13 @@ export default function CommentSection({
     return (
       <div className="group transition-all duration-300">
         <div className="flex gap-3 sm:gap-4">
-          <div className="flex-shrink-0 mt-0.5">
+          <div className="flex-shrink-0">
             <Avatar name={comment.userName} size={isReply ? "xs" : "sm"} />
           </div>
           
           <div className="flex-1 min-w-0">
-            {/* NAME & TIME */}
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[13px] font-bold text-white hover:underline cursor-pointer">
+              <span className="text-[13px] font-bold text-white">
                 {getHandle(comment.userName)}
               </span>
               <span className="text-[12px] text-zinc-500">
@@ -69,7 +92,6 @@ export default function CommentSection({
               </span>
             </div>
 
-            {/* CONTENT */}
             {isEditing ? (
               <div className="mt-2 space-y-2">
                 <textarea
@@ -88,8 +110,7 @@ export default function CommentSection({
               </p>
             )}
 
-            {/* ACTIONS (Reply, Edit, Delete) */}
-            <div className="flex items-center gap-4 mt-2">
+            <div className="flex items-center gap-4 mt-1.5">
               <button
                 onClick={() => {
                   setReplyToId(isReplying ? null : comment.$id);
@@ -99,7 +120,6 @@ export default function CommentSection({
               >
                 Reply
               </button>
-              
               {(currentUserId === comment.userId || isAdmin) && (
                 <div className="flex gap-4 opacity-0 group-hover:opacity-100 transition duration-200">
                   <button onClick={() => onEditStart(comment)} className="text-[12px] font-bold text-zinc-500 hover:text-zinc-300">Edit</button>
@@ -108,7 +128,6 @@ export default function CommentSection({
               )}
             </div>
 
-            {/* REPLY INPUT (INLINE) */}
             {isReplying && (
               <div className="mt-4 flex gap-4 animate-in slide-in-from-top-2 duration-200">
                 <Avatar name="User" size="xs" />
@@ -134,8 +153,8 @@ export default function CommentSection({
               </div>
             )}
 
-            {/* REPLIES TOGGLE & NESTED LIST */}
-            {hasReplies && (
+            {/* FLAT REPLIES LIST */}
+            {hasReplies && !isReply && (
               <div className="mt-1">
                 <button
                   onClick={() => toggleReplies(comment.$id)}
@@ -176,7 +195,6 @@ export default function CommentSection({
         </button>
       </div>
 
-      {/* PRIMARY INPUT */}
       <div className="flex gap-4 mb-10">
         <Avatar name="User" size="sm" />
         <div className="flex-1">
@@ -188,25 +206,15 @@ export default function CommentSection({
           />
           <div className={`flex justify-end gap-2 mt-2 transition-all duration-200 ${value.trim() ? 'opacity-100' : 'opacity-0'}`}>
             <button onClick={() => onChange("")} className="text-[12px] font-bold text-white px-4 py-2 hover:bg-white/10 rounded-full transition">Cancel</button>
-            <button 
-              onClick={() => onSubmit(value)} 
-              className="text-[12px] font-bold text-black bg-blue-400 px-4 py-2 rounded-full hover:bg-blue-300 transition"
-            >
-              Comment
-            </button>
+            <button onClick={() => onSubmit(value)} className="text-[12px] font-bold text-black bg-blue-400 px-4 py-2 rounded-full hover:bg-blue-300 transition">Comment</button>
           </div>
         </div>
       </div>
 
-      {/* MAIN LIST */}
       <div className="space-y-6 sm:space-y-8">
-        {commentTree.length > 0 ? (
-          commentTree.map((comment) => (
-            <CommentItem key={comment.$id} comment={comment} />
-          ))
-        ) : (
-          <p className="text-center text-zinc-500 py-12 text-sm">No comments yet. Start the conversation.</p>
-        )}
+        {commentTree.map((comment) => (
+          <CommentItem key={comment.$id} comment={comment} />
+        ))}
       </div>
     </div>
   );
