@@ -14,7 +14,7 @@ class CommentService {
   }
 
   // ✅ Create Comment
-  async createComment({ postId, userId, userName, content }) {
+  async createComment({ postId, userId, userName, content, parentId = null }) {
     try {
       const res = await this.databases.createDocument(
         import.meta.env.VITE_APPWRITE_DATABASE_ID,
@@ -25,6 +25,7 @@ class CommentService {
           userId,     
           userName,
           content,
+          parentId,
         },
         [
           Permission.read(Role.any()),
