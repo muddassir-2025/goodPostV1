@@ -15,25 +15,14 @@ const items = [
   { to: "/", label: "Home", icon: HomeIcon },
   { to: "/search", label: "Search", icon: SearchIcon },
   { to: "/feed", label: "Following", icon: ReelsIcon },
-  { to: "/notifications", label: "Activity", icon: HeartIcon },
+  { to: "/favorite", label: "Saved", icon: HeartIcon },
   { to: "/profile", label: "Profile", icon: UserIcon },
 ];
 
 export default function BottomNav() {
   const user = useSelector((state) => state.auth.userData);
-  const [unreadCount, setUnreadCount] = useState(0);
-
   useEffect(() => {
-    if (!user) return;
-
-    async function checkNotifications() {
-      const count = await notificationService.countUnread(user.$id);
-      setUnreadCount(count);
-    }
-
-    checkNotifications();
-    const interval = setInterval(checkNotifications, 30000);
-    return () => clearInterval(interval);
+    // Polling removed since activity tab is no longer in bottom nav
   }, [user]);
 
   return (
@@ -56,11 +45,6 @@ export default function BottomNav() {
               <>
                 <div className="relative">
                   <IconComponent className="h-5 w-5" filled={isActive} />
-                  {item.to === "/notifications" && unreadCount > 0 && (
-                    <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white ring-2 ring-black">
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </span>
-                  )}
                 </div>
                 <span>{item.label}</span>
               </>
