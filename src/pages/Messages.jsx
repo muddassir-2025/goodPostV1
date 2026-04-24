@@ -52,15 +52,28 @@ export default function Messages() {
         setFollowingIds(followingResponse || []);
 
         // Enhance conversations with other user's info
-        const enhancedConvs = (convsResponse?.documents || []).map(conv => {
+        const enhancedConvsPromises = (convsResponse?.documents || []).map(async conv => {
           const otherUserId = conv.members.find(id => id !== user.$id);
           const otherUser = uniqueUsersMap.get(otherUserId) || { id: otherUserId, name: "Unknown User" };
+          
+          let actualUnread = conv.unreadCount;
+          if (actualUnread > 0) {
+            // Check if we were the sender
+            const msgs = await messageService.getMessages(conv.$id);
+            const lastMsg = msgs.documents[msgs.documents.length - 1];
+            if (lastMsg && lastMsg.senderId === user.$id) {
+               actualUnread = 0;
+            }
+          }
+
           return {
             ...conv,
+            unreadCount: actualUnread,
             otherUser
           };
         });
         
+        const enhancedConvs = await Promise.all(enhancedConvsPromises);
         setConversations(enhancedConvs);
       } finally {
         if (active) setLoading(false);
