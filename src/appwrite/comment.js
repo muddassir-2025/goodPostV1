@@ -25,7 +25,7 @@ class CommentService {
           userId,     
           userName,
           content,
-          parentId,
+          ...(parentId ? { parentId } : {})
         },
         [
           Permission.read(Role.any()),

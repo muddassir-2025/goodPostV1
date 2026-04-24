@@ -29,12 +29,10 @@ loadModel();
  * Helper: classify image buffer
  */
 async function classifyImage(buffer) {
-    console.log(`[Debug] Buffer received. Size: ${buffer.byteLength} bytes`);
-    
     const imageTensor = tf.node
         .decodeImage(new Uint8Array(buffer), 3)
-        .resizeBilinear([224, 224]);
-        // Removed expandDims(0) - nsfwjs prefers 3D [224, 224, 3]
+        .resizeBilinear([224, 224])
+        .expandDims(0);
 
     const predictions = await model.classify(imageTensor);
 

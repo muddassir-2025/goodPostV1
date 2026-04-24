@@ -31,6 +31,7 @@ export default function PostCard({
   onDelete,
   onEdit,
   onReport,
+  isPriority = false,
 }) {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -38,7 +39,9 @@ export default function PostCard({
 
   const isAdmin = useSelector((state) => state.auth.isAdmin);
   const isOwner = (currentUserId && currentUserId === post.authorID) || isAdmin;
-  const imageSrc = getFileUrl(post.featuredImg);
+  
+  // Optimize image for feed: WebP format, width 800px for quality/size balance
+  const imageSrc = getFileUrl(post.featuredImg, { width: 800, output: "webp" });
   const audioSrc = getFileUrl(post.audioId);
   const captionPreview =
     post.content?.length > 150 ? `${post.content.slice(0, 150).trim()}...` : post.content;
@@ -165,7 +168,8 @@ export default function PostCard({
             <img
               src={imageSrc}
               alt={post.title}
-              loading="lazy"
+              loading={isPriority ? "eager" : "lazy"}
+              fetchpriority={isPriority ? "high" : "auto"}
               className="w-full max-h-[450px] object-contain bg-zinc-900"
             />
           ) : (

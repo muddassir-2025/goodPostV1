@@ -7,11 +7,12 @@ import PostSkeleton from "../components/PostSkeleton";
 import StoryBar from "../components/StoryBar";
 import { SearchIcon } from "../components/ui/Icons";
 import postService from "../appwrite/post";
-import followService from "../appwrite/follow"; // ✅ NEW
+import followService from "../appwrite/follow";
 import { syncFavorite, syncLike } from "../lib/engagement";
 import { confirm, toast } from "../confirmService";
 import { fetchFeedPosts, filterPosts, sortPosts } from "../lib/posts";
 import { buildStories } from "../lib/ui";
+import { motion, AnimatePresence } from "framer-motion";
 
 const filters = [
   { id: "discovery", label: "For You" },
@@ -173,7 +174,7 @@ export default function Home() {
 
     updatePost(post.$id, (current) => ({
       ...current,
-      saved: nextSaved,
+      liked: nextSaved,
       favoriteId: nextSaved ? current.favoriteId : null,
     }));
 
@@ -293,13 +294,20 @@ export default function Home() {
             <button
               key={item.id}
               onClick={() => setFilter(item.id)}
-              className={`rounded-full px-4 py-2 text-sm transition whitespace-nowrap border ${
+              className={`relative rounded-full px-4 py-2 text-sm transition-colors whitespace-nowrap ${
                 filter === item.id
-                  ? "border-transparent bg-white text-black font-medium"
-                  : "border-white/10 bg-white/5 text-zinc-400 hover:text-white"
+                  ? "text-black font-medium"
+                  : "text-zinc-400 hover:text-white"
               }`}
             >
-              {item.label}
+              {filter === item.id && (
+                <motion.div
+                  layoutId="activeFilter"
+                  className="absolute inset-0 rounded-full bg-white"
+                  transition={{ type: "spring", duration: 0.5, bounce: 0.2 }}
+                />
+              )}
+              <span className="relative z-10">{item.label}</span>
             </button>
           ))}
         </div>
@@ -318,9 +326,13 @@ export default function Home() {
                 mediaFilter === item.id ? "text-blue-400" : "text-zinc-500 hover:text-zinc-300"
               }`}
             >
-              {item.label}
+              <span className="relative z-10">{item.label}</span>
               {mediaFilter === item.id && (
-                <div className="absolute -bottom-1 left-0 h-[2px] w-full rounded-full bg-blue-500 animate-in fade-in zoom-in duration-300" />
+                <motion.div 
+                  layoutId="activeMediaFilter"
+                  className="absolute -bottom-1 left-0 h-[2px] w-full rounded-full bg-blue-500"
+                  transition={{ type: "spring", duration: 0.4 }}
+                />
               )}
             </button>
           ))}
@@ -341,33 +353,43 @@ export default function Home() {
       {loading ? (
         <PostSkeleton count={3} />
       ) : visiblePosts.length ? (
-        <div className="space-y-4">
-          {visiblePosts.slice(0, visibleCount).map((post) => (
-            <PostCard
-              key={post.$id}
-              post={post}
-              currentUserId={user?.$id}
-              onToggleLike={handleLikeToggle}
-              onToggleFavorite={handleFavoriteToggle}
-              onDelete={handleDelete}
-              onEdit={(id) => navigate(`/edit/${id}`)}
-              onReport={handleReport}
-            />
-          ))}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={`${filter}-${mediaFilter}`}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="space-y-4"
+          >
+            {visiblePosts.slice(0, visibleCount).map((post, index) => (
+              <PostCard
+                key={post.$id}
+                post={post}
+                currentUserId={user?.$id}
+                onToggleLike={handleLikeToggle}
+                onToggleFavorite={handleFavoriteToggle}
+                onDelete={handleDelete}
+                onEdit={(id) => navigate(`/edit/${id}`)}
+                onReport={handleReport}
+                isPriority={index === 0}
+              />
+            ))}
 
-          {/* INFINITE SCROLL LOADER */}
-          {visibleCount < visiblePosts.length && (
-            <div ref={loaderRef} className="py-6 flex justify-center">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-500 border-t-white"></div>
-            </div>
-          )}
+            {/* INFINITE SCROLL LOADER */}
+            {visibleCount < visiblePosts.length && (
+              <div ref={loaderRef} className="py-6 flex justify-center">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-500 border-t-white"></div>
+              </div>
+            )}
 
-          {visibleCount >= visiblePosts.length && visiblePosts.length > 5 && (
-            <p className="py-8 text-center text-xs text-zinc-500">
-              You've caught up with everything!
-            </p>
-          )}
-        </div>
+            {visibleCount >= visiblePosts.length && visiblePosts.length > 5 && (
+              <p className="py-8 text-center text-xs text-zinc-500">
+                You've caught up with everything!
+              </p>
+            )}
+          </motion.div>
+        </AnimatePresence>
       ) : (
         <EmptyState
           eyebrow="Feed quiet"

@@ -13,7 +13,7 @@ import notificationService from "../appwrite/notification";
 
 const items = [
   { to: "/", label: "Home", icon: HomeIcon },
-  { to: "/search", label: "Search", icon: SearchIcon },
+  { to: "/search", label: "Explore", icon: SearchIcon },
   { to: "/feed", label: "Following", icon: ReelsIcon },
   { to: "/favorites", label: "Saved", icon: HeartIcon },
   { to: "/profile", label: "Profile", icon: UserIcon },
@@ -35,6 +35,12 @@ export default function BottomNav() {
           <NavLink
             key={item.to}
             to={item.to}
+            onClick={(e) => {
+              if (item.to === "/" && window.location.pathname === "/") {
+                e.preventDefault();
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }
+            }}
             className={({ isActive }) =>
               `flex min-w-[62px] flex-col items-center gap-1 rounded-full px-3 py-2 text-[11px] font-medium transition ${
                 isActive ? "bg-zinc-100 !text-zinc-950" : "text-zinc-400"

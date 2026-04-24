@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { useDispatch } from "react-redux";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import authService from "./appwrite/auth";
@@ -6,23 +6,30 @@ import AppErrorBoundary from "./components/AppErrorBoundary";
 import AppShell from "./components/AppShell";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { login, logout } from "./features/auth/authSlice";
-import CreatePost from "./pages/CreatePost";
-import EditPost from "./pages/EditPost";
-import Favorites from "./pages/Favorite";
-import Home from "./pages/Home";
-import Login from "./pages/Login";
-import Messages from "./pages/Messages";
-import Profile from "./pages/Profile";
-import Feed from "./pages/Reels";
-import Search from "./pages/Search";
-import Signup from "./pages/Signup";
-import SinglePost from "./pages/SinglePost";
-import TagFeed from "./pages/TagFeed";
 import ConfirmPopup from "./components/ConfirmPopup";
 import Toast from "./components/Toast";
 
-import Notifications from "./pages/Notifications";
-import Chat from "./pages/Chat";
+// Lazy load pages
+const Home = lazy(() => import("./pages/Home"));
+const Search = lazy(() => import("./pages/Search"));
+const Messages = lazy(() => import("./pages/Messages"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Feed = lazy(() => import("./pages/Reels"));
+const Favorites = lazy(() => import("./pages/Favorite"));
+const Signup = lazy(() => import("./pages/Signup"));
+const Login = lazy(() => import("./pages/Login"));
+const SinglePost = lazy(() => import("./pages/SinglePost"));
+const CreatePost = lazy(() => import("./pages/CreatePost"));
+const EditPost = lazy(() => import("./pages/EditPost"));
+const TagFeed = lazy(() => import("./pages/TagFeed"));
+const Notifications = lazy(() => import("./pages/Notifications"));
+const Chat = lazy(() => import("./pages/Chat"));
+
+const PageLoader = () => (
+  <div className="flex min-h-[60vh] items-center justify-center">
+    <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-500 border-t-white"></div>
+  </div>
+);
 
 function App() {
   const dispatch = useDispatch();
@@ -59,107 +66,109 @@ function App() {
     <ConfirmPopup />
     <Toast />
 
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-
-        <Route
-          element={(
-            <AppErrorBoundary>
-              <AppShell />
-            </AppErrorBoundary>
-          )}
-        >
-          <Route index element={<Home />} />
-          <Route path="/search" element={<Search />} />
-          <Route path="/messages" element={<Messages />} />
-          <Route path="/messages/:conversationId" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-          <Route path="/post/:slug" element={<SinglePost />} />
-          <Route 
-            path="/notifications" 
-            element={
-              <ProtectedRoute>
-                <Notifications />
-              </ProtectedRoute>
-            } 
-          />
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
 
           <Route
-            path="/feed"
-            element={
-              <ProtectedRoute>
-                <Feed />
-              </ProtectedRoute>
-            }
-          />
+            element={(
+              <AppErrorBoundary>
+                <AppShell />
+              </AppErrorBoundary>
+            )}
+          >
+            <Route index element={<Home />} />
+            <Route path="/search" element={<Search />} />
+            <Route path="/messages" element={<Messages />} />
+            <Route path="/messages/:conversationId" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+            <Route path="/post/:slug" element={<SinglePost />} />
+            <Route 
+              path="/notifications" 
+              element={
+                <ProtectedRoute>
+                  <Notifications />
+                </ProtectedRoute>
+              } 
+            />
 
-          <Route
-            path="/reels"
-            element={
-              <ProtectedRoute>
-                <Feed />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/feed"
+              element={
+                <ProtectedRoute>
+                  <Feed />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/favorites"
-            element={
-              <ProtectedRoute>
-                <Favorites />
-              </ProtectedRoute>
-            }
-          />
-          
-          {/* Alias for favorite */}
-          <Route
-            path="/favorite"
-            element={
-              <ProtectedRoute>
-                <Favorites />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/reels"
+              element={
+                <ProtectedRoute>
+                  <Feed />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/favorites"
+              element={
+                <ProtectedRoute>
+                  <Favorites />
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* Alias for favorite */}
+            <Route
+              path="/favorite"
+              element={
+                <ProtectedRoute>
+                  <Favorites />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route path="/tag/:tag" element={<TagFeed />} />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-  path="/profile/:id"
-  element={
-    <ProtectedRoute>
-      <Profile />
-    </ProtectedRoute>
-  }
-/>
+            <Route path="/tag/:tag" element={<TagFeed />} />
 
-          <Route
-            path="/create"
-            element={
-              <ProtectedRoute>
-                <CreatePost />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/profile/:id"
+              element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/edit/:id"
-            element={
-              <ProtectedRoute>
-                <EditPost />
-              </ProtectedRoute>
-            }
-          />
-        </Route>
-      </Routes>
+            <Route
+              path="/create"
+              element={
+                <ProtectedRoute>
+                  <CreatePost />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/edit/:id"
+              element={
+                <ProtectedRoute>
+                  <EditPost />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

@@ -73,7 +73,16 @@ export default function Navbar() {
   return (
     <header className="fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-black/72 backdrop-blur-xl">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-3 py-3 sm:px-5">
-        <Link to="/" className="flex items-center gap-3">
+        <Link 
+          to="/" 
+          onClick={(e) => {
+            if (window.location.pathname === "/") {
+              e.preventDefault();
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+          }}
+          className="flex items-center gap-3 transition-transform hover:scale-105 active:scale-95"
+        >
         <div className="h-11 w-11 overflow-hidden rounded-2xl bg-black shadow-lg shadow-rose-500/20 ring-1 ring-white/10">
   <img
     src="/GoodPost.svg"

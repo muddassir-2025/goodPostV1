@@ -15,12 +15,18 @@ export function normalizeText(value, fallback = "") {
   return fallback;
 }
 
-export function getFileUrl(fileId) {
+export function getFileUrl(fileId, params = {}) {
   if (!fileId || !endpoint || !bucketId || !projectId) {
     return "";
   }
 
-  return `${endpoint}/storage/buckets/${bucketId}/files/${fileId}/view?project=${projectId}`;
+  let url = `${endpoint}/storage/buckets/${bucketId}/files/${fileId}/view?project=${projectId}`;
+  
+  Object.entries(params).forEach(([key, value]) => {
+    url += `&${key}=${encodeURIComponent(value)}`;
+  });
+
+  return url;
 }
 
 export function getInitials(name = "Guest") {

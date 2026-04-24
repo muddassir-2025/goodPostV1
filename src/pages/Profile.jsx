@@ -14,7 +14,6 @@ import {
   PlayIcon, 
   ImageIcon 
 } from "../components/ui/Icons";
-import LogoutBtn from "../components/LogoutBtn";
 
 const PRESET_GRADIENTS = [
   "from-indigo-600 to-blue-500",
@@ -217,7 +216,6 @@ export default function Profile() {
                   >
                     Saved
                   </Link>
-                  <LogoutBtn />
                 </div>
               )}
             </div>
